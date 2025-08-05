@@ -2,3 +2,6 @@
 dataset
 material4project
 *.mp4
+.vscode
+__pycache__/
+*.jpg

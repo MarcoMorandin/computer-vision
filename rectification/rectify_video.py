@@ -56,18 +56,20 @@ def process_video(video_path, calib_path, output_path):
     print(f"Finished processing video: {video_path}")
 
 def main():
-    video_files = glob.glob(os.path.join("data", "videos", "out*.mp4")) # path to the video files
+    params_version = "v2"
+    video_files = glob.glob(os.path.join("..", "data", "videos", "out*.mp4")) # path to the video files
     output_dir = os.path.join("rectified", "videos")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+    
     for video_path in video_files:
         
         basename = os.path.basename(video_path)
         match = re.search(r'out(\d+)\.mp4', basename)
         if match:
             cam_index = match.group(1)
-            
-            calib_path = os.path.join("data", "camera_data", f"cam_{cam_index}", "calib", "camera_calib.json")
+
+            calib_path = os.path.join("..", "data", f"camera_data_{params_version}", f"cam_{cam_index}", "calib", "camera_calib.json")
         else:
             print("Could not extract camera index from filename:", video_path)
             continue
