@@ -1,6 +1,6 @@
 .venv
 dataset
-material4project
+visualization
 *.mp4
 .vscode
 __pycache__/
