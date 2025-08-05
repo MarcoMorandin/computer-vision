@@ -5,24 +5,23 @@ import matplotlib.animation as animation
 import numpy as np
 import os
 
-def plot_and_save_skeleton_3d(json_path, output_folder='output_frames'):
-    # --- 0. Create Output Directory ---
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
-        print(f"Created directory: {output_folder}")
-
+def plot_and_save_skeleton_3d(json_path, coco_json_path, output_folder):
     # --- 1. Load the JSON Data ---
     with open(json_path, 'r') as f:
         data = json.load(f)
+    
+    # --- 2. Load Skeleton Definition from COCO JSON ---
 
-    # --- 2. Skeleton Definition ---
-    skeleton_connections = [
-        [0, 1], [1, 2], [2, 3], [3, 4],    # Right Leg
-        [0, 5], [5, 6], [6, 7], [7, 8],    # Left Leg
-        [0, 9], [9, 10], [10, 11],         # Spine
-        [10, 12], [12, 13], [13, 14],      # Right Arm
-        [10, 15], [15, 16], [16, 17]       # Left Arm
-    ]
+    with open(coco_json_path, 'r') as f:
+        coco_data = json.load(f)
+    
+    # Find the person category to extract skeleton data
+    skeleton_connections = None
+    for category in coco_data.get('categories', []):
+        if category.get('name') == 'person':
+            skeleton_connections = category.get('skeleton', [])
+            skeleton_connections = [(start - 1, end - 1) for start, end in skeleton_connections]
+            break
 
     # --- 3. Set up the 3D Plot ---
     fig = plt.figure(figsize=(10, 8))
@@ -52,11 +51,14 @@ def plot_and_save_skeleton_3d(json_path, output_folder='output_frames'):
         # Plot the bones (connections)
         for start_idx, end_idx in skeleton_connections:
             if start_idx < len(keypoints) and end_idx < len(keypoints):
+                # Check if the keypoints are valid (not NaN or None)
                 start_point = keypoints[start_idx]
                 end_point = keypoints[end_idx]
-                ax.plot([start_point[0], end_point[0]],
-                        [start_point[1], end_point[1]],
-                        [start_point[2], end_point[2]], 'b-', linewidth=2)
+                if (not np.isnan(start_point).any() and not np.isnan(end_point).any() and 
+                    None not in start_point and None not in end_point):
+                    ax.plot([start_point[0], end_point[0]],
+                            [start_point[1], end_point[1]],
+                            [start_point[2], end_point[2]], 'b-', linewidth=2)
 
         ax.set_title(f'3D Skeleton Animation (Frame {frame_key})')
         ax.set_xlabel('X')
@@ -80,8 +82,8 @@ def plot_and_save_skeleton_3d(json_path, output_folder='output_frames'):
 
 if __name__ == '__main__':
     json_file_path = os.path.join('output', 'player_3d_poses.json')
+    coco_json_path = os.path.join('..', 'rectification', 'rectified', 'dataset', 'train', '_annotations.coco.json')
     output_folder = os.path.join('output', 'frames')
 
     os.makedirs(output_folder, exist_ok=True)
-
-    plot_and_save_skeleton_3d(json_file_path, output_folder=output_folder)
+    plot_and_save_skeleton_3d(json_file_path, coco_json_path, output_folder)

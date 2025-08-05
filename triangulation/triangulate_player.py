@@ -248,9 +248,7 @@ def triangulate_player_pose(annotations_file, calib_base_dir, output_dir):
     output_file = os.path.join(output_dir, "player_3d_poses.json")
     with open(output_file, 'w') as f:
         json.dump(player_3d_poses, f, indent=2)
-    
-    print(f"3D poses saved to: {output_file}")
-    
+
     return player_3d_poses
 
 if __name__ == "__main__":
