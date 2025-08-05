@@ -70,7 +70,8 @@ def main(coco_json_path, images_dir, output_dir):
         save_image(img, output_image_path)
 
 if __name__ == "__main__":
-    MODE = 'standard'
+    MODE = 'rectified'
+    # MODE = 'standard'
     
     if MODE == 'standard':
         coco_json_path = os.path.join('data', 'dataset', 'train', '_annotations.coco.json')
