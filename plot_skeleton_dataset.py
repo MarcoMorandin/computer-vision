@@ -70,8 +70,9 @@ def main(coco_json_path, images_dir, output_dir):
         save_image(img, output_image_path)
 
 if __name__ == "__main__":
-    MODE = 'rectified'
+    # MODE = 'rectified'
     # MODE = 'standard'
+    MODE = 'reprojection'
     
     if MODE == 'standard':
         coco_json_path = os.path.join('data', 'dataset', 'train', '_annotations.coco.json')
@@ -81,5 +82,9 @@ if __name__ == "__main__":
         coco_json_path = os.path.join('rectification', 'rectified', 'dataset', 'train', '_annotations.coco.json')
         images_dir = os.path.join('rectification', 'rectified', 'dataset', 'train')
         output_dir = os.path.join('rectification', 'rectified', 'visualizations')
+    elif MODE == 'reprojection':
+        coco_json_path = os.path.join('reprojection', 'output', 'reprojected_annotations.json')
+        images_dir = os.path.join('rectification', 'rectified', 'dataset', 'train')
+        output_dir = os.path.join('reprojection', 'visualizations')
 
     main(coco_json_path, images_dir, output_dir)
