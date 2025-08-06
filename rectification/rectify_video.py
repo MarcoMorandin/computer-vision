@@ -27,18 +27,9 @@ def process_video(video_path, calib_path, output_path):
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-    
 
-    grid_x, grid_y = np.meshgrid(np.arange(width), np.arange(height))
-    pts = np.stack([grid_x, grid_y], axis=-1).astype(np.float32)
-    pts = pts.reshape(-1, 1, 2)
-    
+    map_x, map_y = cv2.initUndistortRectifyMap(mtx, dist, None, mtx, (width, height), cv2.CV_32FC1)
 
-    undistorted_pts = cv2.undistortPoints(pts, mtx, dist, P=mtx)
-    undistorted_map = undistorted_pts.reshape(height, width, 2)
-    map_x = undistorted_map[:, :, 0]
-    map_y = undistorted_map[:, :, 1]
-    
     frame_count = 0
     while True:
         ret, frame = cap.read()

@@ -73,17 +73,8 @@ def rectify_image(image_path, output_path, mtx, dist):
         print(f"Error reading image: {image_path}")
         return False
     
-    height, width = img.shape[:2]
-    
-    grid_x, grid_y = np.meshgrid(np.arange(width), np.arange(height))
-    pts = np.stack([grid_x, grid_y], axis=-1).astype(np.float32)
-    pts = pts.reshape(-1, 1, 2)
-    
-    undistorted_pts = cv2.undistortPoints(pts, mtx, dist, P=mtx)
-    undistorted_map = undistorted_pts.reshape(height, width, 2)
-    map_x = undistorted_map[:, :, 0]
-    map_y = undistorted_map[:, :, 1]
-    
+    map_x, map_y = cv2.initUndistortRectifyMap(mtx, dist, None, mtx, img.shape[:2][::-1], cv2.CV_32FC1)
+
     rectified_img = cv2.remap(img, map_x, map_y, interpolation=cv2.INTER_LINEAR)
     
     cv2.imwrite(output_path, rectified_img)
@@ -127,7 +118,7 @@ def main(input_json, output_json, calib_base_dir, input_images_dir, output_image
         anns = [ann for ann in coco_rect["annotations"] if ann["image_id"] == image_id]
         
         for ann in anns:
-            if "keypoints" in ann:
+            if "keypoints" in ann:                
                 ann["keypoints"] = rectify_keypoints(ann["keypoints"], mtx, dist)
                 new_bbox = update_bbox(ann["keypoints"])
                 if new_bbox:
