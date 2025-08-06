@@ -21,8 +21,7 @@ def load_image(image_path):
         raise ValueError(f"Failed to load image: {image_path}")
     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-def draw_keypoints_and_skeleton(img, keypoints, skeleton_connections):
-
+def draw_keypoints_and_skeleton(img, keypoints, skeleton_connections, color=(0, 255, 0)):
     for x, y, v in keypoints:
         if v > 0 and 0 <= int(x) < img.shape[1] and 0 <= int(y) < img.shape[0]:
             cv2.circle(img, (int(x), int(y)), 5, (255, 0, 0), -1)
@@ -34,7 +33,7 @@ def draw_keypoints_and_skeleton(img, keypoints, skeleton_connections):
             x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
             if (0 <= x1 < img.shape[1] and 0 <= y1 < img.shape[0] and 
                 0 <= x2 < img.shape[1] and 0 <= y2 < img.shape[0]):
-                cv2.line(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.line(img, (x1, y1), (x2, y2), color, 2)
 
 def save_image(img, output_path=None):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -42,8 +41,12 @@ def save_image(img, output_path=None):
     if not cv2.imwrite(output_path, img_bgr):
         raise RuntimeError(f"Failed to save image to {output_path}")
 
-def main(coco_json_path, images_dir, output_dir):
+
+def main(coco_json_path, images_dir, output_dir, rectified_json_path=None):
     coco, person_cat_ids, skeleton_connections = load_coco_data(coco_json_path)
+    if rectified_json_path:
+        rec_coco, rec_person_cat_ids, rec_skeleton_connections = load_coco_data(rectified_json_path)
+        
     image_ids = coco.getImgIds()
         
     for i, image_id in enumerate(image_ids):
@@ -61,12 +64,21 @@ def main(coco_json_path, images_dir, output_dir):
         ann_ids = coco.getAnnIds(imgIds=image_id, catIds=person_cat_ids, iscrowd=None)
         annotations = coco.loadAnns(ann_ids)
         
+        if rectified_json_path:
+            rec_ann_ids = rec_coco.getAnnIds(imgIds=image_id, catIds=rec_person_cat_ids, iscrowd=None)
+            rec_annotations = rec_coco.loadAnns(rec_ann_ids)
+        
        
         for ann in annotations:        
             keypoints = np.array(ann['keypoints']).reshape(18, 3)
             
             draw_keypoints_and_skeleton(img, keypoints, skeleton_connections)
-        
+            
+        if rectified_json_path:
+            for rec_ann in rec_annotations:
+                rec_keypoints = np.array(rec_ann['keypoints']).reshape(18, 3)
+                draw_keypoints_and_skeleton(img, rec_keypoints, rec_skeleton_connections, (0, 0, 255))
+                    
         save_image(img, output_image_path)
 
 if __name__ == "__main__":
@@ -78,13 +90,17 @@ if __name__ == "__main__":
         coco_json_path = os.path.join('data', 'dataset', 'train', '_annotations.coco.json')
         images_dir = os.path.join('data', 'dataset', 'train')
         output_dir = os.path.join('data', 'visualizations')
+        main(coco_json_path, images_dir, output_dir)
     elif MODE == 'rectified':
-        coco_json_path = os.path.join('rectification', 'rectified', 'dataset', 'train', '_annotations.coco.json')
-        images_dir = os.path.join('rectification', 'rectified', 'dataset', 'train')
-        output_dir = os.path.join('rectification', 'rectified', 'visualizations')
+        coco_json_path = os.path.join('rectification', 'output', 'dataset', 'train', '_annotations.coco.json')
+        images_dir = os.path.join('rectification', 'output', 'dataset', 'train')
+        output_dir = os.path.join('rectification', 'output', 'visualizations')
+        main(coco_json_path, images_dir, output_dir)
     elif MODE == 'reprojection':
         coco_json_path = os.path.join('reprojection', 'output', 'reprojected_annotations.json')
-        images_dir = os.path.join('rectification', 'rectified', 'dataset', 'train')
-        output_dir = os.path.join('reprojection', 'visualizations')
+        rectified_json_path = os.path.join('rectification', 'output', 'dataset', 'train', '_annotations.coco.json')
+        images_dir = os.path.join('rectification', 'output', 'dataset', 'train')
+        output_dir = os.path.join('reprojection', 'output', 'visualizations')
+        main(coco_json_path, images_dir, output_dir, rectified_json_path)
 
-    main(coco_json_path, images_dir, output_dir)
+    

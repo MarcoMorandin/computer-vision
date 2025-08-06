@@ -132,10 +132,10 @@ def main(input_json, output_json, calib_base_dir, input_images_dir, output_image
 
 if __name__ == "__main__":
     input_json = os.path.join("..", "data", "dataset", "train", "_annotations.coco.json")
-    output_json = os.path.join("rectified", "dataset", "train", "_annotations.coco.json")
+    output_json = os.path.join("output", "dataset", "train", "_annotations.coco.json")
     
     input_images_dir = os.path.join("..", "data", "dataset", "train")
-    output_images_dir = os.path.join("rectified", "dataset", "train")
+    output_images_dir = os.path.join("output", "dataset", "train")
     
     params_version = "v2"
     calib_base_dir = os.path.join("..", "data", f"camera_data_{params_version}")

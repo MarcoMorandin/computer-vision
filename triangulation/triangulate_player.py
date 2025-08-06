@@ -8,7 +8,11 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.optimize import least_squares
 
 def load_calibration(calib_path):
-    """Load camera calibration parameters from a JSON file."""
+    """Load camera calibration parameters from a JSON file.
+    
+    IMPORTANT: For rectified images, we should use zero distortion coefficients
+    and the same camera matrix used in rectification.
+    """
     with open(calib_path, 'r') as f:
         calib = json.load(f)
     
@@ -19,13 +23,22 @@ def load_calibration(calib_path):
     rvec = np.array(calib["rvecs"], dtype=np.float32).flatten()
     tvec = np.array(calib["tvecs"], dtype=np.float32).flatten()
     
+    # CRITICAL: Since we're working with rectified images, we must use zero distortion
+    # The keypoints have already been undistorted, so applying distortion again is wrong
+    print(f"Original distortion coeffs: {dist}")
+    if np.any(dist):
+        print("WARNING: Forcing distortion coefficients to zero for rectified images!")
+        dist = np.zeros_like(dist)
+    
     # Convert rotation vector to rotation matrix
     R, _ = cv2.Rodrigues(rvec)
     
-    # Create the projection matrix P = K[R|t]
+    # Create the projection matrix P = K[R|t] where t = -R*C (C is camera center)
+    # tvec represents the translation of world origin to camera, so we need -R*tvec
+    t = -R @ tvec
     P = np.zeros((3, 4), dtype=np.float32)
     P[:3, :3] = R
-    P[:3, 3] = tvec
+    P[:3, 3] = t.flatten()
     P = mtx @ P
     
     return mtx, dist, rvec, tvec, P
@@ -103,15 +116,15 @@ def triangulate_points(points_2d_by_camera, projection_matrices, min_views=2):
     # For more than 2 views, use DLT method
     return triangulate_point_dlt(points_2d, proj_matrices)
 
-def bundle_adjust_point(X0, points_2d, proj_matrices, camera_indices):
+def bundle_adjust_point(X0, points_2d, proj_matrices_list, camera_indices):
     """
     Bundle adjustment for a single 3D point to refine the triangulation.
     
     Args:
         X0: Initial 3D point estimate
         points_2d: List of observed 2D points
-        proj_matrices: List of projection matrices
-        camera_indices: List of camera indices corresponding to the 2D points
+        proj_matrices_list: List of projection matrices (ordered to match camera_indices)
+        camera_indices: List of indices for the projection matrices
     
     Returns:
         Refined 3D point
@@ -121,7 +134,7 @@ def bundle_adjust_point(X0, points_2d, proj_matrices, camera_indices):
         errors = []
         
         for i, cam_idx in enumerate(camera_indices):
-            P = proj_matrices[cam_idx]
+            P = proj_matrices_list[cam_idx]
             x_proj = P @ X_homogeneous
             x_proj = x_proj[:2] / x_proj[2]
             
@@ -192,6 +205,13 @@ def triangulate_player_pose(annotations_file, calib_base_dir, output_dir):
         calib_path = os.path.join(calib_base_dir, f"cam_{cam_num}", "calib", "camera_calib.json")
         if os.path.exists(calib_path):
             mtx, dist, rvec, tvec, P = load_calibration(calib_path)
+            
+            # Debug: Print calibration info
+            print(f"Camera {cam_num} calibration:")
+            print(f"  Focal lengths: fx={mtx[0,0]:.1f}, fy={mtx[1,1]:.1f}")
+            print(f"  Translation magnitude: {np.linalg.norm(tvec):.1f}")
+            print(f"  Translation: {tvec.flatten()}")
+            
             camera_calib[cam_num] = {
                 "mtx": mtx,
                 "dist": dist,
@@ -238,7 +258,9 @@ def triangulate_player_pose(annotations_file, calib_base_dir, output_dir):
                 if point_3d is not None:
                     points_2d_list = [points_2d_by_camera[cam] for cam in points_2d_by_camera.keys()]
                     camera_indices = list(points_2d_by_camera.keys())
-                    point_3d = bundle_adjust_point(point_3d, points_2d_list, projection_matrices, camera_indices)
+                    # Create a list of projection matrices matching the order of camera_indices
+                    proj_matrices_list = [projection_matrices[cam] for cam in camera_indices]
+                    point_3d = bundle_adjust_point(point_3d, points_2d_list, proj_matrices_list, range(len(camera_indices)))
             
             keypoints_3d.append(point_3d.tolist() if point_3d is not None else None)
         
@@ -252,7 +274,7 @@ def triangulate_player_pose(annotations_file, calib_base_dir, output_dir):
     return player_3d_poses
 
 if __name__ == "__main__":
-    annotations_file = os.path.join("..", "rectification", "rectified", "dataset", "train", "_annotations.coco.json")
+    annotations_file = os.path.join("..", "rectification", "output", "dataset", "train", "_annotations.coco.json")
     calib_base_dir = os.path.join("..", "data", "camera_data_v2")
     output_dir = os.path.join("output")
     

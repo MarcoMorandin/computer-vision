@@ -82,7 +82,7 @@ def plot_and_save_skeleton_3d(json_path, coco_json_path, output_folder):
 
 if __name__ == '__main__':
     json_file_path = os.path.join('output', 'player_3d_poses.json')
-    coco_json_path = os.path.join('..', 'rectification', 'rectified', 'dataset', 'train', '_annotations.coco.json')
+    coco_json_path = os.path.join('..', 'rectification', 'output', 'dataset', 'train', '_annotations.coco.json')
     output_folder = os.path.join('output', 'frames')
 
     os.makedirs(output_folder, exist_ok=True)

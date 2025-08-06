@@ -49,7 +49,7 @@ def process_video(video_path, calib_path, output_path):
 def main():
     params_version = "v2"
     video_files = glob.glob(os.path.join("..", "data", "videos", "out*.mp4")) # path to the video files
-    output_dir = os.path.join("rectified", "videos")
+    output_dir = os.path.join("output", "videos")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     
