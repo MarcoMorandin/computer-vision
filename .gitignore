@@ -5,3 +5,5 @@ visualization
 .vscode
 __pycache__/
 *.jpg
+*.pt
+*.png
