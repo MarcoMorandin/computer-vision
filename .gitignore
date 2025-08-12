@@ -5,5 +5,6 @@ visualization
 .vscode
 __pycache__/
 *.jpg
-*.pt
+*.pt*
 *.png
+pose_estimation_sapiens/

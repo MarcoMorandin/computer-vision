@@ -104,12 +104,46 @@ def run_pose_estimation(input_dir, input_json, output_json, model_name='yolov11x
         
     coco_pose = copy.deepcopy(coco_data)
     
-    # Extract existing skeleton configuration from COCO data
+    # Extract existing skeleton configuration from COCO data and prune feet/toes
     custom_keypoint_names = None
+    person_category = None
     for category in coco_pose["categories"]:
         if category["name"] == "person":
+            person_category = category
             custom_keypoint_names = category.get("keypoints", [])
             break
+
+    # Remove keypoints that refer to feet/toes (case-insensitive)
+    def is_foot_kpt(name: str) -> bool:
+        n = name.lower()
+        return ("foot" in n) or ("toe" in n)
+
+    kept_keypoint_names = [n for n in custom_keypoint_names if not is_foot_kpt(n)]
+
+    # If present, remap skeleton to exclude removed joints while preserving order
+    if person_category is not None:
+        # Build old index (1-based) -> new index (1-based) map
+        old_to_new = {}
+        for idx, name in enumerate(custom_keypoint_names, start=1):
+            if name in kept_keypoint_names:
+                new_idx = kept_keypoint_names.index(name) + 1
+                old_to_new[idx] = new_idx
+            else:
+                old_to_new[idx] = None
+
+        if "skeleton" in person_category:
+            new_skeleton = []
+            for bone in person_category["skeleton"]:
+                if len(bone) >= 2:
+                    a, b = bone[0], bone[1]
+                    na = old_to_new.get(a)
+                    nb = old_to_new.get(b)
+                    if na is not None and nb is not None:
+                        new_skeleton.append([na, nb])
+            person_category["skeleton"] = new_skeleton
+
+        # Update keypoint names in the category to match pruned list
+        person_category["keypoints"] = kept_keypoint_names
     
     # Load the YOLO model
     model = YOLO(model_name)
@@ -161,8 +195,9 @@ def run_pose_estimation(input_dir, input_json, output_json, model_name='yolov11x
                     "confidence": float(kpts_conf[i])
                 }
             
-            custom_keypoints = remap_to_custom_skeleton(coco_kpts_person, custom_keypoint_names)
-            keypoints_flat = keypoints_to_flat_array(custom_keypoints, custom_keypoint_names)
+            # Build keypoints only for kept keypoint names (feet/toes removed)
+            custom_keypoints = remap_to_custom_skeleton(coco_kpts_person, kept_keypoint_names)
+            keypoints_flat = keypoints_to_flat_array(custom_keypoints, kept_keypoint_names)
             
             # Convert bbox from [center_x, center_y, w, h] to [top_left_x, top_left_y, w, h]
             bbox_xywh = boxes_tensor.xywh[person_idx].cpu().numpy()

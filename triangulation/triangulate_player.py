@@ -7,39 +7,35 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.optimize import least_squares
 
-def load_calibration(calib_path):
-    """Load camera calibration parameters from a JSON file.
-    
-    IMPORTANT: For rectified images, we should use zero distortion coefficients
-    and the same camera matrix used in rectification.
-    """
+def load_calibration(calib_path, use_camera_center=False):
+    """Load camera calibration with proper coordinate system handling."""
     with open(calib_path, 'r') as f:
         calib = json.load(f)
     
     mtx = np.array(calib["mtx"], dtype=np.float32)
     dist = np.array(calib["dist"], dtype=np.float32).flatten()
     
-    # Extract rotation and translation vectors
+    # Force zero distortion for rectified images
+    print(f"Original distortion coeffs: {dist}")
+    dist = np.zeros_like(dist)
+    
     rvec = np.array(calib["rvecs"], dtype=np.float32).flatten()
     tvec = np.array(calib["tvecs"], dtype=np.float32).flatten()
     
-    # CRITICAL: Since we're working with rectified images, we must use zero distortion
-    # The keypoints have already been undistorted, so applying distortion again is wrong
-    print(f"Original distortion coeffs: {dist}")
-    if np.any(dist):
-        print("WARNING: Forcing distortion coefficients to zero for rectified images!")
-        dist = np.zeros_like(dist)
-    
-    # Convert rotation vector to rotation matrix
     R, _ = cv2.Rodrigues(rvec)
     
-    # Create the projection matrix P = K[R|t] where t = -R*C (C is camera center)
-    # tvec represents the translation of world origin to camera, so we need -R*tvec
-    t = -R @ tvec
-    P = np.zeros((3, 4), dtype=np.float32)
-    P[:3, :3] = R
-    P[:3, 3] = t.flatten()
-    P = mtx @ P
+    if use_camera_center:
+        # If tvec represents camera center in world coords
+        # Then t_cam = -R @ C_world
+        t_cam = -R @ tvec.reshape(3, 1)
+        P = mtx @ np.hstack([R, t_cam])
+    else:
+        # Standard: tvec is world origin in camera coords
+        P = mtx @ np.hstack([R, tvec.reshape(3, 1)])
+    
+    # Alternative: Try decomposing and reconstructing
+    # This can help identify scale issues
+    print(f"Projection matrix condition number: {np.linalg.cond(P)}")
     
     return mtx, dist, rvec, tvec, P
 
@@ -104,14 +100,6 @@ def triangulate_points(points_2d_by_camera, projection_matrices, min_views=2):
     
     points_2d = [points_2d_by_camera[cam] for cam in valid_cameras]
     proj_matrices = [projection_matrices[cam] for cam in valid_cameras]
-    
-    # Use OpenCV's triangulatePoints if we have exactly 2 views
-    if len(valid_cameras) == 2:
-        points_2d_arr = np.array(points_2d).T  # Shape (2, n_points)
-        points_4d = cv2.triangulatePoints(proj_matrices[0], proj_matrices[1], 
-                                         points_2d_arr[0:1], points_2d_arr[1:2])
-        point_3d = points_4d[:3] / points_4d[3]
-        return point_3d.flatten()
     
     # For more than 2 views, use DLT method
     return triangulate_point_dlt(points_2d, proj_matrices)
