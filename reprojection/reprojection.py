@@ -1,340 +1,237 @@
-import os
+"""Minimal script to reproject 3D skeleton keypoints onto each camera
+and export a COCO-style annotations file.
+
+Simplifications vs earlier version:
+    * Hardcoded input / output paths (no CLI)
+    * Removed fallback logic & optional branches
+    * Always rebuild images list synthetically
+    * Single category (id=1, name='person') always created
+"""
+
+from __future__ import annotations
+
 import json
-import glob
-import argparse
-from copy import deepcopy
-import numpy as np
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, List, Optional, Sequence, Tuple
+
 import cv2
+import numpy as np
 
-def load_calibration(calib_path, use_camera_center=False, force_zero_dist=True):
-    with open(calib_path, 'r') as f:
-        calib = json.load(f)
+_FILENAME_RE = re.compile(r"out(\d+)_frame_(\d+)")
 
-    K = np.array(calib["mtx"], dtype=np.float32)
-    dist = np.array(calib["dist"], dtype=np.float32).flatten()
-    if force_zero_dist:
-        dist = np.zeros_like(dist)
+@dataclass(frozen=True)
+class CameraCalibration:
+    """Container for intrinsic / extrinsic camera parameters.
 
-    rvec = np.array(calib["rvecs"], dtype=np.float32).flatten()
-    tvec = np.array(calib["tvecs"], dtype=np.float32).flatten()
-    R, _ = cv2.Rodrigues(rvec)
+    Attributes
+    -----------
+    K: (3,3) intrinsic matrix
+    dist: (n,) distortion coefficients as stored (unused in current reprojection path)
+    rvec: (3,) Rodrigues rotation vector
+    tvec: (3,) translation vector
+    R: (3,3) rotation matrix
+    P: (3,4) projection matrix  K [R|t]
+    """
 
-    if use_camera_center:
-        # If tvec is camera center C_world -> t_cam = -R @ C_world
-        t_cam = -R @ tvec.reshape(3, 1)
-        P = K @ np.hstack([R, t_cam])
-    else:
-        # Standard OpenCV: tvec is world origin in camera coordinates
-        P = K @ np.hstack([R, tvec.reshape(3, 1)])
+    K: np.ndarray
+    dist: np.ndarray
+    rvec: np.ndarray
+    tvec: np.ndarray
+    R: np.ndarray
+    P: np.ndarray
 
-    return {
-        "K": K,
-        "dist": dist,
-        "rvec": rvec,
-        "tvec": tvec,
-        "R": R,
-        "P": P
-    }
+    @staticmethod
+    def from_json(path: Path) -> "CameraCalibration":
+        with path.open("r") as f:
+            calib = json.load(f)
+        K = np.asarray(calib["mtx"], dtype=np.float32)
+        dist = np.asarray(calib["dist"], dtype=np.float32).reshape(-1)
+        rvec = np.asarray(calib["rvecs"], dtype=np.float32).reshape(-1)
+        tvec = np.asarray(calib["tvecs"], dtype=np.float32).reshape(-1)
+        R, _ = cv2.Rodrigues(rvec)
+        P = K @ np.hstack([R, tvec[:, None]])
+        return CameraCalibration(K, dist, rvec, tvec, R, P)
 
-def load_all_cameras(calib_base_dir, use_camera_center=False, force_zero_dist=True):
-    cams = {}
-    for cam_dir in glob.glob(os.path.join(calib_base_dir, "cam_*")):
-        calib_path = os.path.join(cam_dir, "calib", "camera_calib.json")
-        if not os.path.exists(calib_path):
+    def project(self, points_3d: np.ndarray) -> np.ndarray:
+        """Project 3D points (N,3) to pixel coords (N,2) using precomputed P.
+
+        Points with NaNs propagate NaNs in output.
+        """
+        if points_3d.size == 0:
+            return np.empty((0, 2), dtype=np.float32)
+        # Homogenize
+        X_h = np.concatenate([points_3d, np.ones((points_3d.shape[0], 1), dtype=points_3d.dtype)], axis=1)
+        x = (self.P @ X_h.T).T
+        with np.errstate(divide="ignore", invalid="ignore"):
+            uv = x[:, :2] / x[:, 2:3]
+        return uv.astype(np.float32)
+
+def load_all_cameras(calib_dir: Path) -> Dict[str, CameraCalibration]:
+    cameras: Dict[str, CameraCalibration] = {}
+    for cam_path in calib_dir.glob("cam_*"):
+        calib_path = cam_path / "calib" / "camera_calib.json"
+        if not calib_path.exists():
             continue
-        cam_name = os.path.basename(cam_dir)  # e.g., "cam_1"
-        cam_id = cam_name.split("_")[-1]      # "1"
-        cams[cam_id] = load_calibration(calib_path, use_camera_center, force_zero_dist)
-    return cams
+        cam_id = cam_path.name.split("_")[-1]
+        cameras[cam_id] = CameraCalibration.from_json(calib_path)
+    if not cameras:
+        raise FileNotFoundError(f"No calibration files found in {calib_dir}")
+    return cameras
 
-def project_points_with_P(points_3d, P):
-    """
-    points_3d: (N,3)
-    P: 3x4
-    Returns (N,2) pixel coordinates
-    """
-    X_h = np.hstack([points_3d, np.ones((points_3d.shape[0], 1), dtype=points_3d.dtype)])
+def project_points_with_P(points_3d: np.ndarray, P: np.ndarray) -> np.ndarray:
+    X_h = np.concatenate([points_3d, np.ones((points_3d.shape[0], 1), dtype=points_3d.dtype)], axis=1)
     x = (P @ X_h.T).T
-    uv = x[:, :2] / x[:, 2:3]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        uv = x[:, :2] / x[:, 2:3]
     return uv
 
-def depth_in_camera(points_3d, R, tvec):
-    """
-    Compute Z in camera coords: Z_cam = (R X + t)_z
-    points_3d: (N,3)
-    """
-    X_cam = (R @ points_3d.T + tvec.reshape(3,1)).T
+def depth_in_camera(points_3d: np.ndarray, R: np.ndarray, tvec: np.ndarray) -> np.ndarray:
+    X_cam = (R @ points_3d.T + tvec.reshape(3, 1)).T
     return X_cam[:, 2]
 
-def reproject_3d_skeletons_to_2d(skeleton_3d_path, calib_base_dir, out_path=None,
-                                 use_camera_center=False, force_zero_dist=True,
-                                 drop_behind_camera=True):
-    # Load 3D skeletons {frame_id(str or int): [[x,y,z], ...]}
-    with open(skeleton_3d_path, "r") as f:
-        skeletons_3d = json.load(f)
-
-    # Normalize frame keys to strings for consistent save
-    skeletons_3d = {str(k): v for k, v in skeletons_3d.items()}
-
-    # Load cameras
-    cams = load_all_cameras(calib_base_dir, use_camera_center, force_zero_dist)
-    if not cams:
-        raise RuntimeError(f"No camera calibrations found in {calib_base_dir}/cam_*/calib/camera_calib.json")
-
-    # Prepare output: {frame_id: {cam_id: [[u,v] or None, ...]}}
-    reprojected = {}
-
-    for frame_id, keypoints_3d in sorted(skeletons_3d.items(), key=lambda x: int(x[0])):
-        pts3d = []
-        # In your data, each keypoint is [x, y, z]; they all seem valid floats
-        for kp in keypoints_3d:
-            if kp is None:
-                pts3d.append(None)
-            else:
-                pts3d.append([float(kp[0]), float(kp[1]), float(kp[2])])
-        pts3d = np.array([p if p is not None else [np.nan, np.nan, np.nan] for p in pts3d], dtype=np.float64)
-
-        reprojected[frame_id] = {}
-        for cam_id, C in cams.items():
-            # Compute 2D via P
-            uv = project_points_with_P(pts3d, C["P"])
-
-            # Optionally mark points behind camera as invalid
-            if drop_behind_camera:
-                z_cam = depth_in_camera(pts3d, C["R"], C["tvec"])
-                valid = np.isfinite(uv).all(axis=1) & (z_cam > 1e-6)
-            else:
-                valid = np.isfinite(uv).all(axis=1)
-
-            # Build per-kp list with None for invalid
-            pts2d_list = []
-            for i in range(uv.shape[0]):
-                if valid[i]:
-                    pts2d_list.append([float(uv[i,0]), float(uv[i,1])])
-                else:
-                    pts2d_list.append(None)
-
-            reprojected[frame_id][cam_id] = pts2d_list
-
-    if out_path:
-        os.makedirs(os.path.dirname(out_path), exist_ok=True)
-        with open(out_path, "w") as f:
-            json.dump(reprojected, f, indent=2)
-        print(f"Saved reprojected 2D keypoints to: {out_path}")
-
-    return reprojected, cams
+def _to_np_keypoints_3d(kps: Sequence[Optional[Sequence[float]]]) -> np.ndarray:
+    """Convert a list of optional [x,y,z] to an (N,3) array with NaNs for missing."""
+    arr = [kp if kp is not None else (np.nan, np.nan, np.nan) for kp in kps]
+    return np.asarray(arr, dtype=np.float32)
 
 
-def _infer_keypoint_names(n_kp, existing_names=None):
-    if existing_names and len(existing_names) == n_kp:
-        return existing_names
-    return [f"kp_{i}" for i in range(n_kp)]
+def reproject_3d_skeletons_to_2d(skeleton_3d_path: Path, calib_dir: Path) -> Dict[str, Dict[str, List[Optional[List[float]]]]]:
+    with skeleton_3d_path.open("r") as f:
+        skel3d = json.load(f)
+    skel3d = {str(k): v for k, v in skel3d.items()}
+    cameras = load_all_cameras(calib_dir)
 
+    out: Dict[str, Dict[str, List[Optional[List[float]]]]] = {}
+    for frame_id, keypoints in sorted(skel3d.items(), key=lambda x: int(x[0])):
+        pts3d = _to_np_keypoints_3d(keypoints)
+        frame_result: Dict[str, List[Optional[List[float]]]] = {}
+        for cam_id, calib in cameras.items():
+            uv = calib.project(pts3d)
+            valid = np.isfinite(uv).all(axis=1)
+            frame_result[cam_id] = [ [float(u), float(v)] if valid[i] else None for i, (u, v) in enumerate(uv) ]
+        out[frame_id] = frame_result
+    return out
 
-def _parse_cam_and_frame_from_name(name):
-    # Expect pattern like out<cam_id>_frame_<frame:04d>.png
-    try:
-        base = os.path.splitext(os.path.basename(name))[0]
-        # Remove possible hashed / roboflow added parts after original pattern
-        # Find the segment containing 'out' and 'frame'
-        # Example original: out5_frame_0004_png.rf.xxxxxx  -> extra.name has out5_frame_0004
-        if "_png" in base:
-            base = base.split("_png")[0]
-        parts = base.split("_frame_")
-        cam_part = parts[0]  # out5
-        frame_part = parts[1]
-        cam_id = cam_part.replace("out", "")
-        frame_id = str(int(frame_part))  # strip zeros
-        return cam_id, frame_id
-    except Exception:
-        return None, None
-
-
-def build_coco_from_reprojected(reprojected, template_coco_path, output_coco_path,
-                                image_width=3840, image_height=2160,
-                                overwrite_keypoint_names=False,
-                                category_name="person"):
+def build_coco(reprojected: Dict[str, Dict[str, List[Optional[List[float]]]]], out_path: Path) -> Dict[str, object]:
+    """Build a COCO dictionary copying the preamble (info/licenses/categories)
+    from TEMPLATE_COCO_PATH if it exists, otherwise falling back to a minimal
+    single 'person' category. Images list is always generated freshly.
     """
-    reprojected: {frame_id: {cam_id: [[u,v] or None, ...]}}
-    template_coco_path: path to existing COCO json to copy structure (info, licenses, categories)
-    output_coco_path: where to write new coco json with annotations built from reprojected data
-    """
-    with open(template_coco_path, 'r') as f:
+    # Copy preamble from template if available
+    with TEMPLATE_COCO_PATH.open("r") as f:
         template = json.load(f)
-
-    # Deep copy base for output
-    coco = {
-        "info": template.get("info", {}),
-        "licenses": template.get("licenses", []),
-        "categories": deepcopy(template.get("categories", [])),
-        "images": [],
-        "annotations": []
-    }
-
-    # Determine number of keypoints from first available entry
-    first_frame = next(iter(reprojected.values()))
-    first_cam = next(iter(first_frame.values()))
-    n_kp = len(first_cam)
-
-    # Locate category to update / use
-    cat_idx = None
-    for i, c in enumerate(coco["categories"]):
-        if c.get("name") == category_name:
-            cat_idx = i
-            break
-    if cat_idx is None and coco["categories"]:
-        cat_idx = 0  # fallback to first
-    if cat_idx is None:
-        # Create a category if none
-        coco["categories"].append({
-            "id": 1,
-            "name": category_name,
-            "supercategory": "",
-            "keypoints": [],
-            "skeleton": []
-        })
-        cat_idx = 0
-
-    category = coco["categories"][cat_idx]
-    existing_names = category.get("keypoints", [])
-    if overwrite_keypoint_names or len(existing_names) != n_kp:
-        category["keypoints"] = _infer_keypoint_names(n_kp, existing_names if not overwrite_keypoint_names else None)
-    if "skeleton" not in category:
-        category["skeleton"] = []
-    category_id = category.get("id", 1)
-    # Ensure unique category ids (if template had weird 0/1 ids keep them)
-    if category_id is None:
-        category_id = 1
-        category["id"] = 1
-
-    # Build mapping (cam_id, frame_id) -> reprojected keypoints
-    # We will try to leverage images in template if they have an "extra" name field.
+    info = template.get("info", {})
+    licenses = template.get("licenses", [])
+    categories = template.get("categories", [])
+    
+    # Build image list trying to preserve template file names for matching
+    template_images = []
     template_images = template.get("images", [])
-    used_pairs = set()
-    image_id_counter = 0
-    image_entries = []
+    
+    # Locate / ensure 'person' category and its id
+    person_cat = next((c for c in categories if c.get("name") == "person"), None)
+    person_cat_id = person_cat["id"]
 
+    images: List[dict] = []
+    mapping: Dict[Tuple[str, str], int] = {}  # (frame_id, cam_id) -> image_id
+    
+    img_id_counter = 0
+    # First pass: reuse template image names where possible
     for img in template_images:
-        name_field = img.get("extra", {}).get("name") or img.get("file_name")
-        cam_id, frame_id = _parse_cam_and_frame_from_name(name_field)
-        if cam_id is None or frame_id is None:
+        file_name = img.get("file_name", "")
+        m = _FILENAME_RE.search(file_name)
+        if not m:
             continue
+        cam_id = m.group(1)
+        frame_id = str(int(m.group(2)))
         if frame_id in reprojected and cam_id in reprojected[frame_id]:
-            image_id = img.get("id")
-            if image_id is None:
-                image_id = image_id_counter
-            image_id_counter = max(image_id_counter, image_id + 1)
-            new_img = {
-                "id": image_id,
-                "file_name": img.get("file_name", name_field),
-                "width": img.get("width", image_width),
-                "height": img.get("height", image_height),
-                "date_captured": img.get("date_captured", ""),
-                "license": img.get("license", 1),
-                "extra": img.get("extra", {"name": name_field})
-            }
-            image_entries.append(new_img)
-            used_pairs.add((cam_id, frame_id, image_id))
+            images.append({
+                "id": img_id_counter,
+                "file_name": file_name,
+                "width": img.get("width", 3840),
+                "height": img.get("height", 2160),
+            })
+            mapping[(frame_id, cam_id)] = img_id_counter
+            img_id_counter += 1
 
-    # If template lacked images for some projections, create them
-    if not image_entries:
-        # build synthetic names
-        for frame_id, cams_dict in reprojected.items():
-            for cam_id in cams_dict.keys():
-                image_id = image_id_counter
-                image_id_counter += 1
-                file_name = f"out{cam_id}_frame_{int(frame_id):04d}.png"
-                image_entries.append({
-                    "id": image_id,
-                    "file_name": file_name,
-                    "width": image_width,
-                    "height": image_height,
-                    "date_captured": "",
-                    "license": 1,
-                    "extra": {"name": file_name}
-                })
-                used_pairs.add((cam_id, frame_id, image_id))
+    # Second pass: add any missing frame/cam combos with synthetic names
+    for frame_id, cams in reprojected.items():
+        for cam_id in cams.keys():
+            if (frame_id, cam_id) in mapping:
+                continue
+            file_name = f"out{cam_id}_frame_{int(frame_id):04d}.png"
+            images.append({
+                "id": img_id_counter,
+                "file_name": file_name,
+                "width": 3840,
+                "height": 2160,
+            })
+            mapping[(frame_id, cam_id)] = img_id_counter
+            img_id_counter += 1
 
-    coco["images"] = image_entries
-
-    # Build annotations
+    # Build annotations using mapping
+    annotations: List[dict] = []
     ann_id = 0
-    for img in coco["images"]:
-        name_field = img.get("extra", {}).get("name") or img.get("file_name")
-        cam_id, frame_id = _parse_cam_and_frame_from_name(name_field)
-        if cam_id is None or frame_id is None:
-            continue
-        if frame_id not in reprojected or cam_id not in reprojected[frame_id]:
-            continue
-        kp_list = reprojected[frame_id][cam_id]
-        # Build flattened keypoints list
-        flat = []
-        xs, ys = [], []
-        for kp in kp_list:
-            if kp is None:
-                flat.extend([0, 0, 0])
-            else:
-                x, y = kp
-                flat.extend([float(x), float(y), 2])  # visibility=2 (visible)
-                xs.append(x)
-                ys.append(y)
-        if xs:
+    for frame_id, cams in reprojected.items():
+        for cam_id, kps in cams.items():
+            image_id = mapping[(frame_id, cam_id)]
+            flat: List[float] = []
+            xs: List[float] = []
+            ys: List[float] = []
+            for kp in kps:
+                if kp is None:
+                    flat.extend([0, 0, 0])
+                else:
+                    x, y = kp
+                    flat.extend([float(x), float(y), 2])
+                    xs.append(x)
+                    ys.append(y)
+            if not xs:
+                continue
             x_min, y_min = float(np.min(xs)), float(np.min(ys))
             x_max, y_max = float(np.max(xs)), float(np.max(ys))
             bbox = [x_min, y_min, x_max - x_min, y_max - y_min]
             area = float((x_max - x_min) * (y_max - y_min))
-        else:
-            # Skip annotation if no valid keypoints
-            continue
-        num_kp = int(sum(1 for v in flat[2::3] if v > 0))
-        ann = {
-            "id": ann_id,
-            "image_id": img["id"],
-            "category_id": category_id,
-            "keypoints": flat,
-            "num_keypoints": num_kp,
-            "bbox": bbox,
-            "area": area,
-            "iscrowd": 0
-        }
-        coco["annotations"].append(ann)
-        ann_id += 1
+            num_kp = int(sum(1 for v in flat[2::3] if v > 0))
+            annotations.append({
+                "id": ann_id,
+                "image_id": image_id,
+                "category_id": person_cat_id,
+                "keypoints": flat,
+                "num_keypoints": num_kp,
+                "bbox": bbox,
+                "area": area,
+                "iscrowd": 0,
+            })
+            ann_id += 1
 
-    os.makedirs(os.path.dirname(output_coco_path), exist_ok=True)
-    with open(output_coco_path, 'w') as f:
+    coco = {
+        "info": info,
+        "licenses": licenses,
+        "categories": categories,
+        "images": images,
+        "annotations": annotations,
+    }
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w") as f:
         json.dump(coco, f, indent=2)
-    print(f"COCO annotations saved to: {output_coco_path} (images={len(coco['images'])}, annotations={len(coco['annotations'])})")
-
+    print(f"Saved COCO file to {out_path} (images={len(images)}, annotations={len(annotations)})")
     return coco
 
-def parse_args():
-    p = argparse.ArgumentParser(description="Reproject 3D skeletons and export COCO annotations.")
-    p.add_argument('--skeleton_3d', default="../triangulation/output/player_3d_poses.json", help='Path to 3D skeleton JSON')
-    p.add_argument('--calib_base', default=os.path.join('..', 'data', 'camera_data_v2'), help='Base directory containing cam_*/calib/camera_calib.json')
 
-    p.add_argument('--template_coco', default=os.path.join('..', 'rectification', 'output', 'dataset', 'train', '_annotations.coco.json'), help='Template COCO json to copy info/licenses/categories/images')
-    p.add_argument('--coco_out', default='output/reprojected_annotations.json', help='Output COCO annotations json file')
-    p.add_argument('--no_zero_dist', action='store_true', help='Use original distortion coefficients')
-    p.add_argument('--use_camera_center', action='store_true', help='Interpret tvec as camera center')
-    p.add_argument('--keep_keypoint_names', action='store_true', help='Keep template keypoint names even if count mismatches (will pad/truncate)')
-    p.add_argument('--no_drop_behind_camera', action='store_true', help='Do NOT invalidate points behind camera')
-    return p.parse_args()
+
+SKELETON_3D_PATH = Path("../triangulation/output/player_3d_poses.json")
+CALIB_DIR = Path("../data/camera_data_v2")
+TEMPLATE_COCO_PATH = Path("../rectification/output/dataset/train/_annotations.coco.json")
+COCO_OUT = Path("output/reprojected_annotations.json")
+
+
+def main():
+    reproj = reproject_3d_skeletons_to_2d(SKELETON_3D_PATH, CALIB_DIR)
+    build_coco(reproj, COCO_OUT)
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    reprojected, cams = reproject_3d_skeletons_to_2d(
-        args.skeleton_3d,
-        args.calib_base,
-        use_camera_center=False,
-        force_zero_dist=not args.no_zero_dist,
-        drop_behind_camera=not args.no_drop_behind_camera
-    )
-
-    if args.template_coco and args.coco_out:
-        build_coco_from_reprojected(
-            reprojected,
-            args.template_coco,
-            args.coco_out,
-            overwrite_keypoint_names=not args.keep_keypoint_names
-        )
+    main()
