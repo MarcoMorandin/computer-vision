@@ -1,0 +1,88 @@
+# Pipeline Visualization Configuration
+# Add this to your existing hydra config or create a new one
+
+# Visualization settings
+enable_visualization: true
+save_intermediate_steps: true
+visualization_output_dir: "output/pipeline_visualizations"
+
+# Maximum frames to process (useful for testing)
+max_frames_to_visualize: 10
+
+# Visualization specific settings
+visualization:
+  figure_size: [15, 10]  # Width, height in inches
+  dpi: 100
+  font_size: 12
+  
+  # Cleanup settings
+  cleanup_old_runs: true
+  keep_latest: 10  # Keep only the latest N visualization runs
+  
+  # Step-specific settings
+  steps:
+    raw_images:
+      enabled: true
+      grid_cols: 3  # Number of columns in image grid
+      
+    rectification:
+      enabled: true
+      show_comparison: true  # Show before/after comparison
+      
+    pose_estimation:
+      enabled: true
+      show_confidence: true
+      confidence_threshold: 0.5
+      
+    triangulation:
+      enabled: true
+      show_3d_plot: true
+      equal_aspect_ratio: true
+      
+    reprojection:
+      enabled: true
+      show_error_analysis: true
+      color_original: [0, 0, 255]  # Red for original poses
+      color_reprojected: [0, 255, 0]  # Green for reprojected poses
+      
+    summary:
+      enabled: true
+      include_statistics: true
+      save_json: true
+
+# Keypoint configuration (adjust based on your pose model)
+keypoints:
+  names: [
+    'nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear',
+    'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+    'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
+    'left_knee', 'right_knee', 'left_ankle', 'right_ankle'
+  ]
+  
+  # Skeleton connections (COCO format)
+  connections: [
+    [0, 1], [0, 2], [1, 3], [2, 4],  # Head
+    [5, 6], [5, 7], [7, 9], [6, 8], [8, 10],  # Arms
+    [5, 11], [6, 12], [11, 12],  # Torso
+    [11, 13], [13, 15], [12, 14], [14, 16]  # Legs
+  ]
+
+# Pipeline component settings (example - adjust for your pipeline)
+pose_model:
+  type: "yolo"  # or "mediapipe", "vit_pose", "prob_pose"
+  confidence_threshold: 0.25
+  
+data_source:
+  type: "existing_coco"  # or "video_file", "streaming", "roboflow"
+  dataset_path: "dataset/train"
+
+# Output settings
+output:
+  base_dir: "output"
+  save_results: true
+  save_visualizations: true
+  
+# Logging
+logging:
+  level: "INFO"
+  save_logs: true

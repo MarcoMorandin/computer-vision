@@ -1,0 +1,15 @@
+[2025-08-13 19:38:15,315][cv_pipeline.core.hydra_config][INFO] - Logging configured at 20 level
+[2025-08-13 19:38:15,315][cv_pipeline.core.hydra_config][INFO] - Logs will be saved to: output/pipeline.log
+[2025-08-13 19:38:15,315][cv_pipeline.core.hydra_config][INFO] - Output directory created: output
+[2025-08-13 19:38:15,316][cv_pipeline.core.hydra_config][INFO] - Configuration validation passed
+[2025-08-13 19:38:15,316][cv_pipeline.core.hydra_config][INFO] - === Pipeline Configuration ===
+[2025-08-13 19:38:15,316][cv_pipeline.core.hydra_config][INFO] - Data Source: roboflow_dataset
+[2025-08-13 19:38:15,316][cv_pipeline.core.hydra_config][INFO] - Pose Model: yolo
+[2025-08-13 19:38:15,316][cv_pipeline.core.hydra_config][INFO] - Camera Version: v2
+[2025-08-13 19:38:15,316][cv_pipeline.core.hydra_config][INFO] - Output Directory: output
+[2025-08-13 19:38:15,316][cv_pipeline.core.hydra_config][INFO] - Rectification: True
+[2025-08-13 19:38:15,316][cv_pipeline.core.hydra_config][INFO] - Triangulation: True
+[2025-08-13 19:38:15,317][cv_pipeline.core.hydra_config][INFO] - Reprojection: True
+[2025-08-13 19:38:15,317][__main__][INFO] - Initializing data source: roboflow_dataset
+[2025-08-13 19:38:16,675][RoboflowDataSource][ERROR] - Failed to initialize Roboflow dataset: [Errno 63] File name too long: '{\n  "name": "hpe_7",\n  "type": "keypoint-detection",\n  "workspace": "hpe-8ebos"\n}-{\n  "name": "hpe_7",\n  "type": "keypoint-detection",\n  "version": "2",\n  "augmentation": {},\n  "created": 1754686669.692,\n  "preprocessing": {},\n  "splits": {\n    "train": 150\n  },\n  "workspace": "hpe-8ebos"\n}'
+[2025-08-13 19:38:16,675][__main__][ERROR] - Failed to initialize data source

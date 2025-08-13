@@ -1,0 +1,9 @@
+# @package data_source
+_target_: cv_pipeline.data_sources.data_sources.VideoFileDataSource
+
+type: video_file
+path: "path/to/video.mp4"
+frame_rate: null  # Use original frame rate
+start_frame: 0
+end_frame: null  # Process entire video
+extensions: [".mp4", ".avi", ".mov", ".mkv"]

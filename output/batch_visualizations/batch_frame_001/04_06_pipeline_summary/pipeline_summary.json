@@ -1,0 +1,94 @@
+{
+  "frame_id": "batch_frame_001",
+  "total_steps": 4,
+  "timestamp": "2025-08-13T21:00:02.529094",
+  "steps_completed": [
+    "01_raw_images",
+    "03_pose_estimation",
+    "04_triangulated_skeleton"
+  ],
+  "pipeline_data": {
+    "steps": [
+      {
+        "step_number": 1,
+        "step_name": "01_raw_images",
+        "timestamp": "2025-08-13T21:00:02.168523",
+        "metadata": {
+          "num_cameras": 3,
+          "camera_ids": [
+            "cam_1",
+            "cam_2",
+            "cam_3"
+          ],
+          "image_shapes": {
+            "cam_1": [
+              480,
+              640,
+              3
+            ],
+            "cam_2": [
+              480,
+              640,
+              3
+            ],
+            "cam_3": [
+              480,
+              640,
+              3
+            ]
+          },
+          "output_path": "output/batch_visualizations/batch_frame_001/01_01_raw_images"
+        }
+      },
+      {
+        "step_number": 2,
+        "step_name": "03_pose_estimation",
+        "timestamp": "2025-08-13T21:00:02.348619",
+        "metadata": {
+          "num_cameras": 3,
+          "pose_statistics": {
+            "cam_1": {
+              "num_poses": 1,
+              "keypoints_per_pose": [
+                17
+              ]
+            },
+            "cam_2": {
+              "num_poses": 1,
+              "keypoints_per_pose": [
+                17
+              ]
+            },
+            "cam_3": {
+              "num_poses": 1,
+              "keypoints_per_pose": [
+                17
+              ]
+            }
+          },
+          "total_poses": 3,
+          "output_path": "output/batch_visualizations/batch_frame_001/02_03_pose_estimation"
+        }
+      },
+      {
+        "step_number": 3,
+        "step_name": "04_triangulated_skeleton",
+        "timestamp": "2025-08-13T21:00:02.529040",
+        "metadata": {
+          "num_skeletons": 1,
+          "num_keypoints": 17,
+          "triangulated_shape": [
+            17,
+            3
+          ],
+          "output_path": "output/batch_visualizations/batch_frame_001/03_04_triangulated_skeleton"
+        }
+      }
+    ],
+    "timestamp": "2025-08-13T21:00:01.993336",
+    "metadata": {}
+  },
+  "frame_index": 1,
+  "processing_time": 0.13048313726455524,
+  "quality_score": 0.8524943272484926
+}

@@ -1,0 +1,9 @@
+# @package pose_model
+_target_: cv_pipeline.pose_estimation.prob_estimator.ProbPoseEstimator
+
+type: prob_pose
+config_path: "cv_pipeline/pose_estimation/ProbPose/configs/body_2d_keypoint/topdown_probmap/coco/td-pm_ProbPose-small_8xb64-210e_coco-256x192.py"
+checkpoint_path: "cv_pipeline/pose_estimation/models/prob-pose.pth"
+detector_model: "cv_pipeline/pose_estimation/models/yolo11l.pt"
+confidence_threshold: 0.25
+device: "auto"

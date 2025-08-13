@@ -1,0 +1,155 @@
+{
+  "frame_id": "demo_frame_001",
+  "total_steps": 6,
+  "timestamp": "2025-08-13T20:59:57.966335",
+  "steps_completed": [
+    "01_raw_images",
+    "02_rectified_images",
+    "03_pose_estimation",
+    "04_triangulated_skeleton",
+    "05_reprojected_poses"
+  ],
+  "pipeline_data": {
+    "steps": [
+      {
+        "step_number": 1,
+        "step_name": "01_raw_images",
+        "timestamp": "2025-08-13T20:59:57.260468",
+        "metadata": {
+          "num_cameras": 3,
+          "camera_ids": [
+            "cam_1",
+            "cam_2",
+            "cam_3"
+          ],
+          "image_shapes": {
+            "cam_1": [
+              480,
+              640,
+              3
+            ],
+            "cam_2": [
+              480,
+              640,
+              3
+            ],
+            "cam_3": [
+              480,
+              640,
+              3
+            ]
+          },
+          "output_path": "output/pipeline_visualizations_demo/demo_frame_001/01_01_raw_images"
+        }
+      },
+      {
+        "step_number": 2,
+        "step_name": "02_rectified_images",
+        "timestamp": "2025-08-13T20:59:57.525892",
+        "metadata": {
+          "num_cameras": 3,
+          "camera_ids": [
+            "cam_1",
+            "cam_2",
+            "cam_3"
+          ],
+          "has_comparison": true,
+          "output_path": "output/pipeline_visualizations_demo/demo_frame_001/02_02_rectified_images"
+        }
+      },
+      {
+        "step_number": 3,
+        "step_name": "03_pose_estimation",
+        "timestamp": "2025-08-13T20:59:57.694596",
+        "metadata": {
+          "num_cameras": 3,
+          "pose_statistics": {
+            "cam_1": {
+              "num_poses": 1,
+              "keypoints_per_pose": [
+                17
+              ]
+            },
+            "cam_2": {
+              "num_poses": 1,
+              "keypoints_per_pose": [
+                17
+              ]
+            },
+            "cam_3": {
+              "num_poses": 1,
+              "keypoints_per_pose": [
+                17
+              ]
+            }
+          },
+          "total_poses": 3,
+          "output_path": "output/pipeline_visualizations_demo/demo_frame_001/03_03_pose_estimation"
+        }
+      },
+      {
+        "step_number": 4,
+        "step_name": "04_triangulated_skeleton",
+        "timestamp": "2025-08-13T20:59:57.791104",
+        "metadata": {
+          "num_skeletons": 1,
+          "num_keypoints": 17,
+          "triangulated_shape": [
+            17,
+            3
+          ],
+          "output_path": "output/pipeline_visualizations_demo/demo_frame_001/04_04_triangulated_skeleton"
+        }
+      },
+      {
+        "step_number": 5,
+        "step_name": "05_reprojected_poses",
+        "timestamp": "2025-08-13T20:59:57.966072",
+        "metadata": {
+          "num_cameras": 3,
+          "reprojection_statistics": {
+            "cam_1": {
+              "has_reprojected": true,
+              "has_original": true,
+              "reprojection_error": {
+                "mean_error": 326.5918792583847,
+                "max_error": 525.1642527471765,
+                "std_error": 129.8326569207503
+              }
+            },
+            "cam_2": {
+              "has_reprojected": true,
+              "has_original": true,
+              "reprojection_error": {
+                "mean_error": 292.95157367512064,
+                "max_error": 586.6493084530833,
+                "std_error": 142.39871591408684
+              }
+            },
+            "cam_3": {
+              "has_reprojected": true,
+              "has_original": true,
+              "reprojection_error": {
+                "mean_error": 307.0525169291993,
+                "max_error": 562.5088728609837,
+                "std_error": 134.4415134079336
+              }
+            }
+          },
+          "has_comparison": true,
+          "output_path": "output/pipeline_visualizations_demo/demo_frame_001/05_05_reprojected_poses"
+        }
+      }
+    ],
+    "timestamp": "2025-08-13T20:59:56.934630",
+    "metadata": {}
+  },
+  "total_cameras": 3,
+  "total_detected_poses": 3,
+  "triangulation_success": true,
+  "reprojection_errors": {
+    "cam_1": 1.655372309918774,
+    "cam_2": 3.4847721823266227,
+    "cam_3": 3.5015289142912978
+  }
+}

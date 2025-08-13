@@ -1,0 +1,52 @@
+{
+  "frame_id": "real_demo_frame",
+  "total_steps": 3,
+  "timestamp": "2025-08-13T21:00:01.436052",
+  "steps_completed": [
+    "01_raw_images",
+    "03_pose_estimation"
+  ],
+  "pipeline_data": {
+    "steps": [
+      {
+        "step_number": 1,
+        "step_name": "01_raw_images",
+        "timestamp": "2025-08-13T20:59:58.934567",
+        "metadata": {
+          "num_cameras": 1,
+          "camera_ids": [
+            "real_cam"
+          ],
+          "image_shapes": {
+            "real_cam": [
+              2160,
+              3840,
+              3
+            ]
+          },
+          "output_path": "output/real_pipeline_visualizations/real_demo_frame/01_01_raw_images"
+        }
+      },
+      {
+        "step_number": 2,
+        "step_name": "03_pose_estimation",
+        "timestamp": "2025-08-13T21:00:01.435294",
+        "metadata": {
+          "num_cameras": 1,
+          "pose_statistics": {
+            "real_cam": {
+              "num_poses": 0,
+              "keypoints_per_pose": []
+            }
+          },
+          "total_poses": 0,
+          "output_path": "output/real_pipeline_visualizations/real_demo_frame/02_03_pose_estimation"
+        }
+      }
+    ],
+    "timestamp": "2025-08-13T20:59:58.351866",
+    "metadata": {}
+  },
+  "estimator_type": "YOLOPoseEstimator",
+  "real_data_used": true
+}

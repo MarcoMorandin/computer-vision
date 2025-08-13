@@ -1,0 +1,33 @@
+data_source:
+  _target_: cv_pipeline.data_sources.data_sources.RoboflowDataSource
+  type: roboflow_dataset
+  api_key: hxV5hVaLyFxEucIzLY1p
+  workspace: hpe-8ebos
+  project: hpe_7
+  version: 2
+  format_type: coco
+  download_path: dataset
+pose_model:
+  _target_: cv_pipeline.pose_estimation.yolo_estimator.YOLOPoseEstimator
+  type: yolo
+  model_name: cv_pipeline/pose_estimation/models/yolo11l-pose.pt
+  confidence_threshold: 0.25
+  device: auto
+pipeline:
+  enable_rectification: true
+  enable_triangulation: true
+  enable_reprojection: true
+  min_cameras_for_triangulation: 2
+  confidence_threshold: 0.25
+camera:
+  params_version: v2
+  calibration_base_dir: data/camera_data_${camera.params_version}
+output:
+  base_dir: output
+  save_intermediate: true
+  save_visualizations: true
+  save_3d_poses: true
+logging:
+  level: INFO
+  save_logs: true
+  log_file: ${output.base_dir}/pipeline.log

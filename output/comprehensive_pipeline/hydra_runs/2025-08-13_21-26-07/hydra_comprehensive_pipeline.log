@@ -1,0 +1,3 @@
+[2025-08-13 21:26:07,145][CVPipeline][INFO] - Starting Comprehensive Computer Vision Workflow
+[2025-08-13 21:26:07,145][CVPipeline][INFO] - ============================================================
+[2025-08-13 21:26:07,145][CVPipeline][ERROR] - Comprehensive workflow failed: 'ComprehensiveHydraPipeline' object has no attribute 'initialize_visualizer'

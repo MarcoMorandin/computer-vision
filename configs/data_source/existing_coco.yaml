@@ -1,0 +1,7 @@
+# @package data_source
+_target_: cv_pipeline.data_sources.data_sources.ExistingDataSource
+
+type: existing_coco
+coco_file: "dataset"
+images_dir: null  # No images needed for pose-only processing
+use_existing_poses: true

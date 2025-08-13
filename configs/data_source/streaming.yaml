@@ -1,0 +1,8 @@
+# @package data_source
+_target_: cv_pipeline.data_sources.data_sources.StreamingVideoDataSource
+
+type: streaming_video
+stream_url: "rtmp://your-stream-url"
+buffer_size: 10
+reconnect_attempts: 3
+timeout: 30

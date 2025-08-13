@@ -1,0 +1,15 @@
+[2025-08-13 19:39:02,197][cv_pipeline.core.hydra_config][INFO] - Logging configured at 20 level
+[2025-08-13 19:39:02,197][cv_pipeline.core.hydra_config][INFO] - Logs will be saved to: output/pipeline.log
+[2025-08-13 19:39:02,197][cv_pipeline.core.hydra_config][INFO] - Output directory created: output
+[2025-08-13 19:39:02,198][cv_pipeline.core.hydra_config][INFO] - Configuration validation passed
+[2025-08-13 19:39:02,198][cv_pipeline.core.hydra_config][INFO] - === Pipeline Configuration ===
+[2025-08-13 19:39:02,198][cv_pipeline.core.hydra_config][INFO] - Data Source: roboflow_dataset
+[2025-08-13 19:39:02,198][cv_pipeline.core.hydra_config][INFO] - Pose Model: yolo
+[2025-08-13 19:39:02,198][cv_pipeline.core.hydra_config][INFO] - Camera Version: v2
+[2025-08-13 19:39:02,198][cv_pipeline.core.hydra_config][INFO] - Output Directory: output
+[2025-08-13 19:39:02,198][cv_pipeline.core.hydra_config][INFO] - Rectification: True
+[2025-08-13 19:39:02,198][cv_pipeline.core.hydra_config][INFO] - Triangulation: True
+[2025-08-13 19:39:02,198][cv_pipeline.core.hydra_config][INFO] - Reprojection: True
+[2025-08-13 19:39:02,198][__main__][INFO] - Initializing data source: roboflow_dataset
+[2025-08-13 19:39:03,487][RoboflowDataSource][ERROR] - Failed to initialize Roboflow dataset: int() argument must be a string, a bytes-like object or a real number, not 'Version'
+[2025-08-13 19:39:03,488][__main__][ERROR] - Failed to initialize data source

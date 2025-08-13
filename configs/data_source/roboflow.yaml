@@ -1,0 +1,10 @@
+# @package data_source
+_target_: cv_pipeline.data_sources.data_sources.RoboflowDataSource
+
+type: roboflow_dataset
+api_key: hxV5hVaLyFxEucIzLY1p
+workspace: hpe-8ebos
+project: hpe_7
+version: 2
+format_type: "coco"
+download_path: "dataset"

@@ -1,0 +1,66 @@
+defaults:
+  - config
+  - _self_
+
+# Override pipeline configuration for comprehensive workflow
+pipeline:
+  enable_rectification: true
+  enable_triangulation: true
+  enable_reprojection: true
+  min_cameras_for_triangulation: 2
+  confidence_threshold: 0.25
+
+# Override output settings
+output:
+  base_dir: "output/comprehensive_pipeline"
+  save_intermediate: true
+  save_visualizations: true
+  save_3d_poses: true
+
+# Override data source configuration
+data_source:
+  dataset_path: "dataset"
+  annotation_file: "train/_annotations.coco.json"
+  max_frames: 10  # Limit for demonstration
+  load_images: true
+  load_annotations: true
+
+# Override pose estimation configuration
+pose_estimation:
+  model_name: "yolo11l-pose.pt"
+  confidence_threshold: 0.25
+  save_predictions: true
+  save_visualizations: true
+
+# Override rectification configuration
+rectification:
+  camera_params_dir: "data/camera_data_v3"
+  use_cached_params: true
+  save_rectified_images: true
+  rectification_method: "stereo"
+
+# Override triangulation configuration
+triangulation:
+  method: "least_squares"
+  min_cameras: 2
+  save_3d_skeleton: true
+  create_animation: true
+  filter_outliers: true
+
+# Override evaluation configuration
+evaluation:
+  metrics: ["pck", "mpjpe", "reprojection_error"]
+  pck_threshold: 0.1
+  save_reprojections: true
+  compute_detailed_metrics: true
+
+# Visualization configuration
+visualization:
+  figure_size: [12, 8]
+  dpi: 300
+  save_individual_steps: true
+  create_summary_plots: true
+  skeleton_color_gt: [255, 0, 0]  # Red for ground truth
+  skeleton_color_pred: [0, 255, 0]  # Green for predictions
+  animation_fps: 10
+  animation_duration: 5.0

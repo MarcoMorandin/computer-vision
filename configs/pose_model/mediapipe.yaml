@@ -1,0 +1,10 @@
+# @package pose_model
+_target_: cv_pipeline.pose_estimation.mediapipe_estimator.MediaPipePoseEstimator
+
+type: mediapipe
+model_complexity: 2
+enable_segmentation: false
+static_image_mode: false
+min_detection_confidence: 0.5
+min_tracking_confidence: 0.5
+confidence_threshold: 0.25

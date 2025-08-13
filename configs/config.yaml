@@ -1,0 +1,38 @@
+# Main pipeline configuration
+defaults:
+  - data_source: roboflow
+  - pose_model: yolo
+  - _self_
+
+# Pipeline settings
+pipeline:
+  enable_rectification: true
+  enable_triangulation: true
+  enable_reprojection: true
+  min_cameras_for_triangulation: 2
+  confidence_threshold: 0.25
+
+# Camera settings
+camera:
+  params_version: "v2"
+  calibration_base_dir: "data/camera_data_${camera.params_version}"
+
+# Output settings
+output:
+  base_dir: "output"
+  save_intermediate: true
+  save_visualizations: true
+  save_3d_poses: true
+
+# Logging
+logging:
+  level: INFO
+  save_logs: true
+  log_file: "${output.base_dir}/pipeline.log"
+
+# Hydra settings
+hydra:
+  run:
+    dir: ${output.base_dir}/hydra_runs/${now:%Y-%m-%d_%H-%M-%S}
+  job:
+    chdir: false

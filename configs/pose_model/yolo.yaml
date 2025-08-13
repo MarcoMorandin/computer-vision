@@ -1,0 +1,7 @@
+# @package pose_model
+_target_: cv_pipeline.pose_estimation.yolo_estimator.YOLOPoseEstimator
+
+type: yolo
+model_name: "cv_pipeline/pose_estimation/models/yolo11l-pose.pt"
+confidence_threshold: 0.25
+device: "auto"  # auto, cpu, cuda

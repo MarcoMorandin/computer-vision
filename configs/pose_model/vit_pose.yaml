@@ -1,0 +1,8 @@
+# @package pose_model
+_target_: cv_pipeline.pose_estimation.vit_estimator.ViTPoseEstimator
+
+type: vit_pose
+model_name: "usyd-community/vitpose-plus-huge"
+detector_model: "cv_pipeline/pose_estimation/models/yolo11l.pt"
+confidence_threshold: 0.25
+device: "auto"

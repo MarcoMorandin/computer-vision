@@ -1,0 +1,10 @@
+.venv
+dataset
+visualization
+*.mp4
+.vscode
+__pycache__/
+*.jpg
+*.pt*
+*.png
+pose_estimation_sapiens/

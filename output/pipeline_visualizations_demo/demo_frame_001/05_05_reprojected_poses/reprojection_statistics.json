@@ -1,0 +1,29 @@
+{
+  "cam_1": {
+    "has_reprojected": true,
+    "has_original": true,
+    "reprojection_error": {
+      "mean_error": 326.5918792583847,
+      "max_error": 525.1642527471765,
+      "std_error": 129.8326569207503
+    }
+  },
+  "cam_2": {
+    "has_reprojected": true,
+    "has_original": true,
+    "reprojection_error": {
+      "mean_error": 292.95157367512064,
+      "max_error": 586.6493084530833,
+      "std_error": 142.39871591408684
+    }
+  },
+  "cam_3": {
+    "has_reprojected": true,
+    "has_original": true,
+    "reprojection_error": {
+      "mean_error": 307.0525169291993,
+      "max_error": 562.5088728609837,
+      "std_error": 134.4415134079336
+    }
+  }
+}

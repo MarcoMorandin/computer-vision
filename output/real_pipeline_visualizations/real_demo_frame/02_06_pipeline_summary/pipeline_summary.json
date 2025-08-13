@@ -1,0 +1,35 @@
+{
+  "frame_id": "real_demo_frame",
+  "total_steps": 2,
+  "timestamp": "2025-08-13T20:59:12.940822",
+  "steps_completed": [
+    "01_raw_images"
+  ],
+  "pipeline_data": {
+    "steps": [
+      {
+        "step_number": 1,
+        "step_name": "01_raw_images",
+        "timestamp": "2025-08-13T20:59:12.940298",
+        "metadata": {
+          "num_cameras": 1,
+          "camera_ids": [
+            "real_cam"
+          ],
+          "image_shapes": {
+            "real_cam": [
+              2160,
+              3840,
+              3
+            ]
+          },
+          "output_path": "output/real_pipeline_visualizations/real_demo_frame/01_01_raw_images"
+        }
+      }
+    ],
+    "timestamp": "2025-08-13T20:59:12.394721",
+    "metadata": {}
+  },
+  "estimator_type": "YOLOPoseEstimator",
+  "real_data_used": true
+}

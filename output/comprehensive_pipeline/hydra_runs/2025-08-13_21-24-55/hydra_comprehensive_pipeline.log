@@ -1,0 +1,12 @@
+[2025-08-13 21:24:55,395][CVPipeline][INFO] - Starting Comprehensive Computer Vision Workflow
+[2025-08-13 21:24:55,395][CVPipeline][INFO] - ============================================================
+[2025-08-13 21:24:55,395][CVPipeline][INFO] - Pipeline visualizer initialized
+[2025-08-13 21:24:56,717][RoboflowDataSource][INFO] - Downloading dataset from Roboflow to dataset
+[2025-08-13 21:24:56,717][RoboflowDataSource][INFO] - This may take a few minutes...
+[2025-08-13 21:24:57,028][RoboflowDataSource][INFO] - Loading annotations from dataset/train/_annotations.coco.json
+[2025-08-13 21:24:57,030][RoboflowDataSource][INFO] - Loaded Roboflow dataset with 150 images
+[2025-08-13 21:24:57,030][RoboflowDataSource][INFO] - Found 124 annotations
+[2025-08-13 21:24:57,030][RoboflowDataSource][INFO] - Camera IDs: ['1', '2', '3', '4', '5', '7']
+[2025-08-13 21:24:57,030][CVPipeline][INFO] - Data source initialized successfully with Hydra config
+[2025-08-13 21:24:57,030][CVPipeline][INFO] - === Step 1: Loading Data ===
+[2025-08-13 21:24:57,030][CVPipeline][ERROR] - Comprehensive workflow failed: 'RoboflowDataSource' object has no attribute 'get_frame'

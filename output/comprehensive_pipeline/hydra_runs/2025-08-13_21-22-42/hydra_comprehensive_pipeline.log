@@ -1,0 +1,4 @@
+[2025-08-13 21:22:42,216][CVPipeline][INFO] - Starting Comprehensive Computer Vision Workflow
+[2025-08-13 21:22:42,216][CVPipeline][INFO] - ============================================================
+[2025-08-13 21:22:42,216][CVPipeline][INFO] - Pipeline visualizer initialized
+[2025-08-13 21:22:42,216][CVPipeline][ERROR] - Comprehensive workflow failed: PipelineVisualizer.__init__() got an unexpected keyword argument 'save_individual_steps'

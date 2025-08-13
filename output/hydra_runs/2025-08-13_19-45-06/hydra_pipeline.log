@@ -1,0 +1,43 @@
+[2025-08-13 19:45:06,571][cv_pipeline.core.hydra_config][INFO] - Logging configured at 20 level
+[2025-08-13 19:45:06,571][cv_pipeline.core.hydra_config][INFO] - Logs will be saved to: output/pipeline.log
+[2025-08-13 19:45:06,572][cv_pipeline.core.hydra_config][INFO] - Output directory created: output
+[2025-08-13 19:45:06,572][cv_pipeline.core.hydra_config][INFO] - Configuration validation passed
+[2025-08-13 19:45:06,572][cv_pipeline.core.hydra_config][INFO] - === Pipeline Configuration ===
+[2025-08-13 19:45:06,572][cv_pipeline.core.hydra_config][INFO] - Data Source: roboflow_dataset
+[2025-08-13 19:45:06,572][cv_pipeline.core.hydra_config][INFO] - Pose Model: yolo
+[2025-08-13 19:45:06,572][cv_pipeline.core.hydra_config][INFO] - Camera Version: v2
+[2025-08-13 19:45:06,572][cv_pipeline.core.hydra_config][INFO] - Output Directory: output
+[2025-08-13 19:45:06,572][cv_pipeline.core.hydra_config][INFO] - Rectification: True
+[2025-08-13 19:45:06,572][cv_pipeline.core.hydra_config][INFO] - Triangulation: True
+[2025-08-13 19:45:06,572][cv_pipeline.core.hydra_config][INFO] - Reprojection: True
+[2025-08-13 19:45:06,573][__main__][INFO] - Initializing data source: roboflow_dataset
+[2025-08-13 19:45:07,956][RoboflowDataSource][INFO] - Downloading dataset from Roboflow to dataset
+[2025-08-13 19:45:07,956][RoboflowDataSource][INFO] - This may take a few minutes...
+[2025-08-13 19:45:14,963][RoboflowDataSource][INFO] - Loading annotations from dataset/train/_annotations.coco.json
+[2025-08-13 19:45:14,964][RoboflowDataSource][INFO] - Loaded Roboflow dataset with 150 images
+[2025-08-13 19:45:14,964][RoboflowDataSource][INFO] - Found 124 annotations
+[2025-08-13 19:45:14,964][RoboflowDataSource][INFO] - Camera IDs: ['1', '2', '3', '4', '5', '7']
+[2025-08-13 19:45:14,965][__main__][INFO] - Initializing pose model: yolo
+[2025-08-13 19:45:15,131][YOLOPoseEstimator][INFO] - Initialized YOLO pose model: cv_pipeline/pose_estimation/models/yolo11l-pose.pt
+[2025-08-13 19:45:15,131][__main__][INFO] - Rectifier initialized
+[2025-08-13 19:45:15,131][__main__][INFO] - Triangulator initialized
+[2025-08-13 19:45:15,131][__main__][INFO] - Reprojection evaluator initialized
+[2025-08-13 19:45:15,131][__main__][INFO] - Starting pipeline execution
+[2025-08-13 19:45:27,832][__main__][INFO] - Processed 10 frames
+[2025-08-13 19:45:39,057][__main__][INFO] - Processed 20 frames
+[2025-08-13 19:45:49,618][__main__][INFO] - Processed 30 frames
+[2025-08-13 19:45:59,986][__main__][INFO] - Processed 40 frames
+[2025-08-13 19:46:11,835][__main__][INFO] - Processed 50 frames
+[2025-08-13 19:46:22,720][__main__][INFO] - Processed 60 frames
+[2025-08-13 19:46:35,554][__main__][INFO] - Processed 70 frames
+[2025-08-13 19:46:47,853][__main__][INFO] - Processed 80 frames
+[2025-08-13 19:46:59,057][__main__][INFO] - Processed 90 frames
+[2025-08-13 19:47:10,419][__main__][INFO] - Processed 100 frames
+[2025-08-13 19:47:22,739][__main__][INFO] - Processed 110 frames
+[2025-08-13 19:47:35,226][__main__][INFO] - Processed 120 frames
+[2025-08-13 19:47:46,608][__main__][INFO] - Processed 130 frames
+[2025-08-13 19:47:58,218][__main__][INFO] - Processed 140 frames
+[2025-08-13 19:48:10,505][__main__][INFO] - Processed 150 frames
+[2025-08-13 19:48:10,505][__main__][INFO] - Pipeline execution completed
+[2025-08-13 19:48:10,505][__main__][INFO] - Results: {'frames_processed': 150, 'poses_detected': 300, 'triangulated_poses': 0, 'errors': []}
+[2025-08-13 19:48:10,507][__main__][INFO] - Results saved to: output/pipeline_results.json
