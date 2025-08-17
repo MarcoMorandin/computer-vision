@@ -1,10 +1,7 @@
 .venv
-dataset
-visualization
-*.mp4
-.vscode
+0000todos/
+data/dataset
+data/videos
+output/
 __pycache__/
-*.jpg
-*.pt*
-*.png
-pose_estimation_sapiens/
+weights/
