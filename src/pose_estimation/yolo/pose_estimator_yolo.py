@@ -182,7 +182,7 @@ class YOLOPoseEstimator:
 
             # Run pose estimation
             results = self.model(
-                image, conf=confidence_threshold, imgsz=1280, verbose=False
+                image, conf=confidence_threshold, verbose=False
             )
 
             # Process detections

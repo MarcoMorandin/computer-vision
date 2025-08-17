@@ -23,7 +23,6 @@ class ViTPoseEstimator:
         coco_manager: COCOManager,
         detector_yolo_weights_path: str = 'yolo11l.pt',
         vit_model_name: str = 'usyd-community/vitpose-plus-base',
-        device: Optional[str] = None
     ):
         """
         Initialize the ViTPoseEstimator.
@@ -32,17 +31,15 @@ class ViTPoseEstimator:
             coco_manager: Initialized COCOManager object.
             detector_yolo_model_name: YOLO model name/path for person detection (detection-only).
             vit_model_name: HuggingFace ViT Pose model repo name.
-            device: 'cuda' or 'cpu'. If None, auto-detect.
         """
         self.coco_manager = coco_manager
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
         # Models
         self.detector = YOLO(os.path.abspath((detector_yolo_weights_path)))
-        self.detector.to(self.device)
+        self.detector.to("cuda" if torch.cuda.is_available() else "cpu")
 
         self.processor = AutoProcessor.from_pretrained(vit_model_name, use_fast=False)
-        self.vit_model = VitPoseForPoseEstimation.from_pretrained(vit_model_name).to(self.device)
+        self.vit_model = VitPoseForPoseEstimation.from_pretrained(vit_model_name).to("cuda" if torch.cuda.is_available() else "cpu")
         self.vit_model.eval()
 
         # COCO-17 keypoint order used by ViTPose (lowercase)
@@ -204,8 +201,8 @@ class ViTPoseEstimator:
             image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
             pil_img = Image.fromarray(image_rgb)
 
-            inputs = self.processor(pil_img, boxes=[boxes_xywh], return_tensors="pt").to(self.device)
-            dataset_index = torch.tensor([0], device=self.device)  # 0 = COCO for ViTPose
+            inputs = self.processor(pil_img, boxes=[boxes_xywh], return_tensors="pt").to("cuda" if torch.cuda.is_available() else "cpu")
+            dataset_index = torch.tensor([0], device="cuda" if torch.cuda.is_available() else "cpu")  # 0 = COCO for ViTPose
 
             with torch.no_grad():
                 outputs = self.vit_model(**inputs, dataset_index=dataset_index)

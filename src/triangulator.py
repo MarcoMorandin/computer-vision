@@ -190,32 +190,3 @@ class PlayerTriangulator:
 
     def __str__(self):
         return f"PlayerTriangulator(camera_manager={self.camera_manager}, coco_manager={self.coco_manager})"
-
-def main():
-    """Main function to run player triangulation."""
-    # Configuration
-    annotations_file = os.path.join("..", "rectification", "output", "dataset", "train", "_annotations.coco.json")
-    calib_base_dir = os.path.join("..", "data", "camera_data_v2")
-    output_dir = os.path.join("output")
-    output_file = os.path.join(output_dir, "player_3d_poses.json")
-    
-    # Create output directory
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Initialize managers
-    camera_manager = CameraManager(calib_base_dir)
-    coco_manager = COCOManager(annotations_file)
-    
-    # Create triangulator and process
-    triangulator = PlayerTriangulator(camera_manager, coco_manager)
-    skeleton_manager = triangulator.triangulate(use_bundle_adjustment=True)
-    
-    # Save results
-    skeleton_manager.save(output_file)
-    
-    print(f"Triangulated {skeleton_manager.get_num_frames()} frames")
-    print(f"Results saved to: {output_file}")
-
-
-if __name__ == "__main__":
-    main()

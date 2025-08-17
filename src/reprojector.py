@@ -90,10 +90,6 @@ class SkeletonReprojector:
         # Get available cameras
         camera_ids = self.camera_manager.get_camera_ids()
         for cam_id in camera_ids:
-            # Check if we have an image for this frame/camera combination
-            # if (frame_id, cam_id) not in image_mapping:
-            #     print(frame_id, cam_id)
-            #     continue
                 
             image_id = image_mapping[(frame_id, str(cam_id))]
             

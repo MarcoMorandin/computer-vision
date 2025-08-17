@@ -170,4 +170,3 @@ class PosePlotter3D:
         writer = "ffmpeg" if save.lower().endswith(".mp4") else "imagemagick"
         os.makedirs(os.path.dirname(save), exist_ok=True)
         anim.save(save, writer=writer, fps=fps)
-        print(f"Saved animation to {save}")
