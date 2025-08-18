@@ -1,19 +1,13 @@
-import re
-from pathlib import Path
+"""3D to 2D reprojection module."""
+
 from typing import Dict, List, Optional, Sequence, Tuple
-
 import numpy as np
-import sys
-import os
-
 from tqdm import tqdm
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from .utils.camera.camera_manager import CameraManager
 from .utils.dataset.coco_utils import COCOManager
 from .utils.dataset.skeleton_3d import SkeletonManager3D
-
-_FILENAME_RE = re.compile(r"out(\d+)_frame_(\d+)")
+from .utils.file_utils import extract_frame_cam_from_filename
 
 
 class SkeletonReprojector:
@@ -40,14 +34,6 @@ class SkeletonReprojector:
         arr = [kp if kp is not None else (np.nan, np.nan, np.nan) for kp in kps]
         return np.asarray(arr, dtype=np.float32)
     
-    def _extract_frame_cam_from_filename(self, file_name: str) -> Optional[Tuple[str, str]]:
-        """Extract frame_id and cam_id from filename."""
-        match = _FILENAME_RE.search(file_name)
-        if match:
-            cam_id = match.group(1)
-            frame_id = str(int(match.group(2)))
-            return frame_id, cam_id
-        return None
     
     def reproject(self) -> COCOManager:
         """
@@ -76,7 +62,7 @@ class SkeletonReprojector:
         mapping = {}
         for img in images:
             file_name = img.get("file_name", "")
-            frame_cam = self._extract_frame_cam_from_filename(file_name)
+            frame_cam = extract_frame_cam_from_filename(file_name)
             if frame_cam:
                 frame_id, cam_id = frame_cam
                 mapping[(frame_id, cam_id)] = img["id"]

@@ -1,162 +1,65 @@
+"""YOLO-based pose estimation module."""
+
 import os
 import cv2
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
+from pathlib import Path
+
 from tqdm import tqdm
 from ultralytics import YOLO, settings
-import sys
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+from utils.skeleton.pose_plotter_2d import SkeletonDrawer
 
-from utils.dataset.coco_utils import COCOManager
+from ...utils.dataset.coco_utils import COCOManager
+from ...utils.keypoints import (
+    calculate_virtual_keypoints,
+    create_yolo_keypoint_mapping,
+    get_yolo_keypoint_names,
+    init_keypoints_dict
+)
+from ...utils.geometry import keypoints_to_flat_array
 
 
 class YOLOPoseEstimator:
-    """
-    A class for running YOLO pose estimation and updating COCO dataset annotations.
-    """
+    """YOLO-based pose estimation for updating COCO dataset annotations."""
 
     def __init__(
         self,
         coco_manager: COCOManager,
         model_weights_path: str = "yolo11l-pose.pt",
+        prune_patterns: Optional[List[str]] = None
     ):
-        """
-        Initialize the YOLOPoseEstimator.
+        """Initialize the YOLOPoseEstimator.
 
         Args:
             coco_manager: Initialized COCOManager object
-            model_weights_path: str = "yolo11l-pose.pt",
+            model_weights_path: Path to YOLO pose model weights
+            prune_patterns: Keypoint patterns to prune (default: ["foot", "toe"])
         """
         self.coco_manager = coco_manager
-        self.model = YOLO(os.path.abspath((model_weights_path)))
+        self.model = YOLO(os.path.abspath(model_weights_path))
+        
+        # Get standard YOLO keypoint names
+        self.yolo_keypoint_names = get_yolo_keypoint_names()
+        
+        # Prune unwanted keypoints
+        prune_patterns = prune_patterns or ["foot", "toe"]
+        self.kept_keypoint_names = self.coco_manager.prune_keypoints(prune_patterns)
+        
+        # Create keypoint mapping
+        self.yolo_to_custom_mapping = create_yolo_keypoint_mapping(self.kept_keypoint_names)
 
-        # YOLO COCO-17 keypoint names (0-based indexing)
-        self.yolo_keypoint_names = [
-            "Nose",
-            "LEye",
-            "REye",
-            "LEar",
-            "REar",
-            "LShoulder",
-            "RShoulder",
-            "LElbow",
-            "RElbow",
-            "LWrist",
-            "RWrist",
-            "LHip",
-            "RHip",
-            "LKnee",
-            "RKnee",
-            "LAnkle",
-            "RAnkle",
-        ]
-
-        self.kept_keypoint_names = self.coco_manager.prune_keypoints(["foot", "toe"])
-
-        self.yolo_to_custom_mapping = self._create_keypoint_mapping()
-
-    def _create_keypoint_mapping(self) -> Dict[str, int]:
-        """Create mapping from your custom keypoint names to YOLO indices."""
-        mapping = {}
-
-        # Map your custom keypoint names to YOLO indices
-        keypoint_mapping = {
-            "Nose": 0,
-            "LEye": 1,
-            "REye": 2,
-            "LEar": 3,
-            "REar": 4,
-            "LShoulder": 5,
-            "RShoulder": 6,
-            "LElbow": 7,
-            "RElbow": 8,
-            "LWrist": 9,
-            "RWrist": 10,
-            "LHip": 11,
-            "RHip": 12,
-            "LKnee": 13,
-            "RKnee": 14,
-            "LAnkle": 15,
-            "RAnkle": 16,
-            # Add mappings for custom keypoints to YOLO equivalents
-            "Head": 0,  # Map Head to Nose (closest equivalent)
-            "RHand": 10,  # Map RHand to RWrist
-            "LHand": 9,  # Map LHand to LWrist
-        }
-
-        # Only include keypoints that exist in your custom set
-        for custom_name in self.kept_keypoint_names:
-            if custom_name in keypoint_mapping:
-                mapping[custom_name] = keypoint_mapping[custom_name]
-            elif custom_name in ["Hips", "Neck", "Spine"]:
-                # Virtual keypoints - will be calculated later
-                mapping[custom_name] = -1  # Special marker for virtual keypoints
-
-        return mapping
-
-    def _calculate_virtual_keypoints(self, custom_kpts: Dict[str, Dict]) -> None:
-        """Calculate virtual keypoints like Hips, Neck, Spine."""
-        # Hips (midpoint of left and right hip)
-        if "Hips" in custom_kpts and "LHip" in custom_kpts and "RHip" in custom_kpts:
-            l_hip, r_hip = custom_kpts["LHip"], custom_kpts["RHip"]
-            if l_hip["confidence"] > 0 and r_hip["confidence"] > 0:
-                custom_kpts["Hips"] = {
-                    "x": (l_hip["x"] + r_hip["x"]) / 2,
-                    "y": (l_hip["y"] + r_hip["y"]) / 2,
-                    "confidence": min(l_hip["confidence"], r_hip["confidence"]),
-                }
-
-        # Neck (midpoint of left and right shoulder)
-        if (
-            "Neck" in custom_kpts
-            and "LShoulder" in custom_kpts
-            and "RShoulder" in custom_kpts
-        ):
-            l_shoulder, r_shoulder = custom_kpts["LShoulder"], custom_kpts["RShoulder"]
-            if l_shoulder["confidence"] > 0 and r_shoulder["confidence"] > 0:
-                custom_kpts["Neck"] = {
-                    "x": (l_shoulder["x"] + r_shoulder["x"]) / 2,
-                    "y": (l_shoulder["y"] + r_shoulder["y"]) / 2,
-                    "confidence": min(
-                        l_shoulder["confidence"], r_shoulder["confidence"]
-                    ),
-                }
-
-        # Spine (midpoint of hips and neck)
-        if "Spine" in custom_kpts and "Hips" in custom_kpts and "Neck" in custom_kpts:
-            hips, neck = custom_kpts["Hips"], custom_kpts["Neck"]
-            if hips["confidence"] > 0 and neck["confidence"] > 0:
-                custom_kpts["Spine"] = {
-                    "x": (hips["x"] + neck["x"]) / 2,
-                    "y": (hips["y"] + neck["y"]) / 2,
-                    "confidence": min(hips["confidence"], neck["confidence"]),
-                }
-
-    def _keypoints_to_flat_array(
-        self, custom_kpts: Dict[str, Dict], custom_keypoint_names: List[str]
-    ) -> List[float]:
-        """Convert dictionary of keypoints to flat array for COCO format."""
-        keypoints_flat = []
-        for name in custom_keypoint_names:
-            kpt = custom_kpts[name]
-            x, y, conf = kpt["x"], kpt["y"], kpt["confidence"]
-            visibility = 2 if conf > 0.1 else 0
-            keypoints_flat.extend([round(x, 2), round(y, 2), visibility])
-        return keypoints_flat
 
     def run_pose_estimation(self, confidence_threshold: float = 0.25) -> COCOManager:
-        """
-        Run pose estimation on images and update COCO dataset.
+        """Run pose estimation on images and update COCO dataset.
 
         Args:
-            input_dir: Directory containing input images
             confidence_threshold: Minimum confidence threshold for detections
 
         Returns:
             Updated COCOManager object with new pose annotations
         """
         images = self.coco_manager.get_images()
-        processed_count = 0
 
         # Clear all existing annotations
         self.coco_manager.clear_annotations()
@@ -178,12 +81,8 @@ class YOLOPoseEstimator:
                 print(f"  Warning: Could not load image {file_name}")
                 continue
 
-            processed_count += 1
-
             # Run pose estimation
-            results = self.model(
-                image, conf=confidence_threshold, verbose=False
-            )
+            results = self.model(image, conf=confidence_threshold, verbose=False)
 
             # Process detections
             self._process_detections(results[0], img_id, category_id)
@@ -194,19 +93,24 @@ class YOLOPoseEstimator:
         self,
         video_path: str,
         output_path: str,
-        confidence_threshold: float = 0.25,
-        draw_predictions: bool = True,
-    ) -> None:
+        confidence_threshold: float = 0.25
+    ) -> COCOManager:
         """
-        Run pose estimation on video and save output video with predictions.
+        Run pose estimation on video and create COCO dataset with predictions.
 
         Args:
             video_path: Path to input video
-            output_path: Path to save output video
+            output_video_path: Path to save output video with predictions
+            video_coco_manager: COCOManager created from video frames
             confidence_threshold: Minimum confidence threshold for detections
             draw_predictions: Whether to draw keypoints and skeleton on video
+            
+        Returns:
+            Updated COCOManager with pose predictions
         """
+        
         # Open video
+        drawer = SkeletonDrawer(self.coco_manager)
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             raise ValueError(f"Could not open video: {video_path}")
@@ -217,12 +121,20 @@ class YOLOPoseEstimator:
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        # Setup video writer
+        # Setup video writer if drawing predictions
+        out = None
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
-        frame_count = 0
+        # Get person category for annotations
+        person_category = self.coco_manager.get_person_category()
+        category_id = person_category["id"]
+        
+        # Get all images from the video COCO dataset
+        self.coco_manager.clear_annotations()
+        self.coco_manager.clear_images()
 
+        frame_count = 0
         print(f"Processing video: {video_path}")
         print(f"Total frames: {total_frames}")
 
@@ -235,27 +147,38 @@ class YOLOPoseEstimator:
             if frame_count % 30 == 0:  # Progress update every 30 frames
                 print(f"Processing frame {frame_count}/{total_frames}")
 
-            # Run pose estimation
-            results = self.model(
-                frame, conf=confidence_threshold, imgsz=1280, verbose=False
+            results = self.model(frame, conf=confidence_threshold, verbose=True)
+
+            img_id = self.coco_manager.add_image(
+                file_name=f"{Path(video_path).stem}_frame_{frame_count:04d}.rf.jpg",
+                height=frame.shape[0],
+                width=frame.shape[1],
             )
 
-            # TODO use a skeleton drawer
-            # Draw predictions if requested
-            if draw_predictions:
-                frame = self._process_detections_for_video(results[0], frame)
+            # Process detections
+            keypoint = self._process_detections(results[0], img_id=img_id, category_id=category_id)
 
-            # Write frame to output video
+            if keypoint is not None:
+                frame = drawer.draw_skeleton_on_image(frame, keypoint)
+
+            # Write frame to output video if drawing
             out.write(frame)
 
         # Cleanup
         cap.release()
         out.release()
+        self.coco_manager.save(str(output_path).replace(".mp4", ".json"))
 
-        print(f"Video processing complete. Output saved to: {output_path}")
-
-    def _process_detections(self, result, img_id: int, category_id: int) -> None:
-        """Process YOLO detections and add annotations."""
+        return self.coco_manager
+        
+    def _process_detections(self, result, img_id: int = None, category_id: int = None) -> List[float]:
+        """Process YOLO detections and add annotations.
+        
+        Args:
+            result: YOLO detection result
+            img_id: Image ID for annotation
+            category_id: Person category ID
+        """
         if result.keypoints is None or result.boxes is None:
             return
 
@@ -267,28 +190,23 @@ class YOLOPoseEstimator:
             kpts_xy = keypoints_tensor.xy[person_idx].cpu().numpy()
             kpts_conf = keypoints_tensor.conf[person_idx].cpu().numpy()
 
-            # Initialize all keypoints with zero values first
-            coco_kpts_person = {}
-            for custom_name in self.kept_keypoint_names:
-                coco_kpts_person[custom_name] = {"x": 0.0, "y": 0.0, "confidence": 0.0}
+            # Initialize custom keypoint dictionary
+            custom_kpts = init_keypoints_dict(self.kept_keypoint_names)
 
-            # Convert YOLO keypoints to your custom format using correct mapping
-            for custom_name in self.kept_keypoint_names:
-                if custom_name in self.yolo_to_custom_mapping:
-                    yolo_idx = self.yolo_to_custom_mapping[custom_name]
-
-                    if yolo_idx >= 0:  # Real keypoint from YOLO
-                        coco_kpts_person[custom_name] = {
-                            "x": float(kpts_xy[yolo_idx, 0]),
-                            "y": float(kpts_xy[yolo_idx, 1]),
-                            "confidence": float(kpts_conf[yolo_idx]),
-                        }
+            # Fill in available YOLO keypoints
+            for custom_name, yolo_idx in self.yolo_to_custom_mapping.items():
+                if yolo_idx >= 0:  # Not a virtual keypoint
+                    custom_kpts[custom_name] = {
+                        "x": float(kpts_xy[yolo_idx, 0]),
+                        "y": float(kpts_xy[yolo_idx, 1]),
+                        "confidence": float(kpts_conf[yolo_idx]),
+                    }
 
             # Calculate virtual keypoints
-            self._calculate_virtual_keypoints(coco_kpts_person)
-            keypoints_flat = self._keypoints_to_flat_array(
-                coco_kpts_person, self.kept_keypoint_names
-            )
+            calculate_virtual_keypoints(custom_kpts)
+
+            # Convert to COCO format
+            keypoints_flat = keypoints_to_flat_array(custom_kpts, self.kept_keypoint_names)
 
             # Convert bbox from [center_x, center_y, w, h] to [top_left_x, top_left_y, w, h]
             bbox_xywh = boxes_tensor.xywh[person_idx].cpu().numpy()
@@ -298,7 +216,7 @@ class YOLOPoseEstimator:
                 float(bbox_xywh[2]),  # width
                 float(bbox_xywh[3]),  # height
             ]
-
+        
             # Add annotation using COCOManager
             self.coco_manager.add_annotation(
                 image_id=img_id,
@@ -308,3 +226,4 @@ class YOLOPoseEstimator:
                 area=bbox[2] * bbox[3],
                 num_keypoints=sum(1 for v in keypoints_flat[2::3] if v > 0),
             )
+            return keypoints_flat

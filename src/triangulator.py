@@ -1,17 +1,14 @@
-import os
-import re
+"""3D pose triangulation module."""
+
 import numpy as np
-import cv2
 from typing import Dict, List, Optional, Tuple
 from scipy.optimize import least_squares
-import sys
-
 from tqdm import tqdm
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from .utils.camera.camera_manager import CameraManager
 from .utils.dataset.coco_utils import COCOManager
 from .utils.dataset.skeleton_3d import SkeletonManager3D
+from .utils.file_utils import extract_frame_number, extract_camera_number
 
 
 class PlayerTriangulator:
@@ -30,15 +27,6 @@ class PlayerTriangulator:
         self.camera_manager = camera_manager
         self.coco_manager = coco_manager
     
-    def _extract_frame_number(self, file_name: str) -> Optional[int]:
-        """Extract frame number from the file name."""
-        match = re.search(r'frame_(\d+)', file_name)
-        return int(match.group(1)) if match else None
-    
-    def _extract_camera_number(self, file_name: str) -> Optional[str]:
-        """Extract camera number from the file name."""
-        match = re.search(r'(?:out|cam)(\d+)', file_name)
-        return match.group(1) if match else None
     
     def _triangulate_point_dlt(self, points_2d: List[Tuple[float, float]], 
                               projection_matrices: List[np.ndarray]) -> np.ndarray:
@@ -107,14 +95,13 @@ class PlayerTriangulator:
         # Get all annotations
         for image_info in images:
             annotations = self.coco_manager.get_annotations_by_image_id(image_info["id"])
-            
             for ann in annotations:
                 if "keypoints" not in ann:
                     continue
                 
                 file_name = image_info["file_name"]
-                frame_num = self._extract_frame_number(file_name)
-                cam_num = self._extract_camera_number(file_name)
+                frame_num = extract_frame_number(file_name)
+                cam_num = extract_camera_number(file_name)
                 
                 if frame_num is None or cam_num is None:
                     continue
@@ -149,9 +136,10 @@ class PlayerTriangulator:
         """
         frames_data = self._group_annotations_by_frame()
         skeleton_manager = SkeletonManager3D()
+        
 
         for frame_num, frame_data in tqdm(sorted(frames_data.items()), desc="Triangulating player", unit="frame"):
-
+            
             # Skip frames with insufficient camera views
             if len(frame_data) < 2:
                 print(f"  Skipping frame {frame_num}: insufficient camera views")

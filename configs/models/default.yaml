@@ -1,0 +1,21 @@
+# @package models
+confidence_threshold: 0.5
+
+yolo:
+  pose_model_path: "weights/yolo11s-pose.pt"
+  detection_model_path: "weights/yolo11s.pt"
+  device: "cpu"  # or "cpu"
+
+vit:
+  model_name: "usyd-community/vitpose-plus-base"
+  device: "cpu"  # or "cpu"
+
+triangulation:
+  min_views: 2
+  use_bundle_adjustment: true
+  optimization_method: "lm"  # Levenberg-Marquardt
+
+evaluation:
+  metrics: ["pck", "pckh", "auc"]
+  pck_threshold: 0.2
+  save_plots: true

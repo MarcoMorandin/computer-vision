@@ -1,0 +1,13 @@
+# @package pipeline
+stages:
+  rectification:
+    enabled: false
+    save_visualizations: false
+  pose_estimation:
+    enabled: true
+    models: [ "yolo", "vit"]
+    save_visualizations: true
+  triangulation:
+    enabled: true
+    save_visualizations: true
+    animation_fps: 30

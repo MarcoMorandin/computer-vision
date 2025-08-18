@@ -216,6 +216,53 @@ class COCOManager:
 
         return kept_kpts
     
+    def add_image(
+        self,
+        file_name: str,
+        height: int,
+        width: int,
+        image_id: Optional[int] = None,
+    ) -> int:
+        """
+        Add a new image to the COCO dataset.
+
+        Args:
+            file_name: The name of the image file.
+            height: The height of the image.
+            width: The width of the image.
+            image_id: Optional specific ID to assign to the image. If None,
+                      a new ID is generated automatically.
+
+        Returns:
+            The ID of the added image.
+
+        Raises:
+            ValueError: If the provided image_id already exists in the dataset.
+        """
+        if image_id is None:
+            # Generate a new ID by finding the current maximum and adding 1
+            image_id = max(self.coco.imgs.keys(), default=0) + 1
+        elif image_id in self.coco.imgs:
+            raise ValueError(f"Image ID {image_id} already exists in the dataset.")
+
+        # Create the image dictionary following COCO format
+        image_info = {
+            "id": image_id,
+            "width": width,
+            "height": height,
+            "file_name": file_name,
+            "license": 0,
+            "flickr_url": "",
+            "coco_url": "",
+            "date_captured": "2024-01-01T00:00:00.000000",
+        }
+
+        # Add to the dataset list and the internal pycocotools map
+        self.coco.dataset["images"].append(image_info)
+        self.coco.imgs[image_id] = image_info
+
+        return image_id
+    
     def add_annotation(
         self,
         image_id: int,
@@ -271,6 +318,11 @@ class COCOManager:
         """Clear all annotations from the dataset."""
         self.coco.dataset["annotations"] = []
         self.coco.anns = {}
+        
+    def clear_images(self) -> None:
+        """Clear all images from the dataset."""
+        self.coco.dataset["images"] = []
+        self.coco.imgs = {}
 
     def copy(self) -> "COCOManager":
         """Create a completely independent copy of the COCO dataset."""
@@ -290,6 +342,34 @@ class COCOManager:
         new_manager.skeleton = copy.deepcopy(self.skeleton)
 
         return new_manager
+    
+    def merge(self, others: List["COCOManager"]) -> None:
+        """
+        Merge images and annotations from other COCOManager instances into this one.
+
+        Args:
+            others: List of COCOManager instances to merge into the current dataset.
+        """
+
+        for other in others:
+            # --- Merge images ---
+            for img in other.get_images():
+                added_image_id = self.add_image(
+                    file_name=img["file_name"],
+                    height=img["height"],
+                    width=img["width"],
+                )
+                ann = other.get_annotations_by_image_id(img["id"])
+                if len(ann) > 0:
+                    self.add_annotation(
+                        image_id=added_image_id,
+                        category_id=ann[0]["category_id"],
+                        keypoints=ann[0]["keypoints"],
+                    )
+           
+        # Rebuild internal indices
+        self.coco.createIndex()
+        
 
     def __str__(self) -> str:
         return f"COCODataset(images={len(self.coco.dataset['images'])}, annotations={len(self.coco.dataset['annotations'])})"

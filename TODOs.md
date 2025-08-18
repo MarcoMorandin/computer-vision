@@ -1,0 +1,4 @@
+- adding video streaming processing using mediapipe
+- code cleanup
+- implementing also uv
+- final general verification

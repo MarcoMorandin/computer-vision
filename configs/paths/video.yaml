@@ -1,0 +1,34 @@
+# @package paths
+data:
+  camera_calib_dir: "data/camera_data_v2"
+  dataset_json: "data/dataset/_annotations.coco.json"
+  input_images_dir: "data/dataset"
+  video_dir: "data/videos"
+  video_files:
+    - "data/videos/out1.mp4"
+    - "data/videos/out2.mp4"
+    - "data/videos/out3.mp4"
+    - "data/videos/out4.mp4"
+    - "data/videos/out5.mp4"
+    - "data/videos/out7.mp4"
+
+
+weights:
+  yolo_pose: "weights/yolo11s-pose.pt"
+  yolo_det: "weights/yolo11s.pt"
+
+output:
+  base_dir: "output/video"
+  structure:
+    rectified:
+      root: "output/video/rectified"
+    yolo:
+      predictions:
+        root: "output/video/yolo/predictions"
+      triangulations:
+        root: "output/video/yolo/triangulations"
+    vit:
+      predictions:
+        root: "output/video/vit/predictions"
+      triangulations:
+        root: "output/video/vit/triangulations"

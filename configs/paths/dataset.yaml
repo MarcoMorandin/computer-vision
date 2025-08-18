@@ -1,0 +1,51 @@
+# @package paths
+data:
+  camera_calib_dir: "data/camera_data_v2"
+  dataset_json: "data/dataset/_annotations.coco.json"
+  input_images_dir: "data/dataset"
+
+weights:
+  yolo_pose: "weights/yolo11s-pose.pt"
+  yolo_det: "weights/yolo11s.pt"
+
+output:
+  base_dir: "output"
+  structure:
+    rectified:
+      root: "output/dataset/rectified"
+      visualizations: "output/dataset/rectified/visualizations"
+    ground_truth:
+      triangulations:
+        root: "output/dataset/ground_truth/triangulated"
+        visualizations: "output/dataset/ground_truth/triangulated/visualizations"
+      reprojections:
+        root: "output/dataset/ground_truth/reprojected"
+        visualizations: "output/dataset/ground_truth/reprojected/visualizations"
+      evaluations:
+        reprojections: "output/dataset/ground_truth/evaluations/reprojections"
+    yolo:
+      predictions:
+        root: "output/dataset/yolo/predictions"
+        visualizations: "output/dataset/yolo/predictions/visualizations"
+      triangulations:
+        root: "output/dataset/yolo/triangulations"
+        visualizations: "output/dataset/yolo/triangulations/visualizations"
+      reprojections:
+        root: "output/dataset/yolo/reprojections"
+        visualizations: "output/dataset/yolo/reprojections/visualizations"
+      evaluations:
+        predictions: "output/dataset/yolo/evaluations/predictions"
+        reprojections: "output/dataset/yolo/evaluations/reprojections"
+    vit:
+      predictions:
+        root: "output/dataset/vit/predictions"
+        visualizations: "output/dataset/vit/predictions/visualizations"
+      triangulations:
+        root: "output/dataset/vit/triangulations"
+        visualizations: "output/dataset/vit/triangulations/visualizations"
+      reprojections:
+        root: "output/dataset/vit/reprojections"
+        visualizations: "output/dataset/vit/reprojections/visualizations"
+      evaluations:
+        predictions: "output/dataset/vit/evaluations/predictions"
+        reprojections: "output/dataset/vit/evaluations/reprojections"

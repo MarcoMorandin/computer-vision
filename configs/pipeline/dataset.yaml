@@ -1,0 +1,30 @@
+# @package pipeline
+stages:
+  rectification:
+    enabled: true
+    save_visualizations: true
+    
+  triangulation:
+    enabled: true
+    save_visualizations: true
+    animation_fps: 30
+    
+  pose_estimation:
+    enabled: true
+    models: ["yolo", "vit"]
+    save_visualizations: true
+    
+  reprojection:
+    enabled: true
+    save_visualizations: true
+    
+  evaluation:
+    enabled: true
+    compare_models: true
+    generate_reports: true
+
+execution:
+  parallel_processing: false
+  max_workers: 4
+  progress_bars: true
+  verbose: true
