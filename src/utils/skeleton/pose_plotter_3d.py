@@ -137,21 +137,6 @@ class PosePlotter3D:
         all_artists = [artists["scatter"]] + artists["lines"] + artists.get("texts", [])
         return all_artists
 
-    def plot_single_frame(self, frame_id: int, save: str):
-        """Plots a single frame of the 3D pose."""
-        if frame_id not in self.frame_ids:
-            raise ValueError(f"Frame {frame_id} not found.")
-        
-        frame_idx = self.frame_ids.index(frame_id)
-        title = f"Frame {frame_id}"
-        fig, ax, artists = self._setup_plot(title)
-
-        self._update_plot(frame_idx, artists, ax)
-
-        plt.tight_layout()
-        os.makedirs(os.path.dirname(save), exist_ok=True)
-        plt.savefig(save, dpi=150)
-
     def animate_frames(self, save: str, interval: int = 100):
         """Animates the sequence of 3D poses."""
         if self.poses_data.size == 0:

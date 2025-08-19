@@ -5,7 +5,7 @@
 confidence_threshold: 0.5  # Global default, can be overridden per model
 
 # Device settings (can be overridden globally or per model)
-device: "cuda"  # Options: "cuda", "cpu"
+device: "mps"  # Options: "cuda", "cpu"
 
 keypoints:
   prune_patterns: ["foot"]
@@ -13,8 +13,8 @@ keypoints:
 # YOLO Configuration
 yolo:
   # Model paths
-  pose_model_path: "weights/yolo11x-pose.pt"
-  detection_model_path: "weights/yolo11x.pt"
+  pose_model_path: "weights/yolo11l-pose.pt"
+  detection_model_path: "weights/yolo11l.pt"
   
   # Inference settings
   confidence_threshold: 0.25  # Override global for YOLO
@@ -22,7 +22,7 @@ yolo:
 # ViTPose Configuration  
 vit:
   # Model settings
-  model_name: "usyd-community/vitpose-plus-huge"  
+  model_name: "usyd-community/vitpose-plus-large"  
   # Detection settings (uses YOLO for person detection)
   confidence_threshold: 0.5
 
