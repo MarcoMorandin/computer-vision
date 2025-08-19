@@ -22,14 +22,13 @@ class VideoPipeline(BasePipeline):
     
     def run(self) -> None:
         """Execute the complete video processing pipeline."""
-        # Get video files from config
-        video_files = [str(f) for f in self.config.paths.data.video_files if Path(f).exists()]
-        if not video_files:
-            self.logger.error("No video files found in config")
-            return
-        
+
+        video_files = [str(f) for f in self.config.paths.data.video_files if Path(f).exists()]        
         self.logger.info(f"Processing {len(video_files)} video files")
         
+        ##################################################
+        # Rectify Videos
+        ##################################################
         rectified_output = Path(self.config.paths.output.structure.rectified.root)
         
         for video_path in video_files:            
@@ -39,12 +38,13 @@ class VideoPipeline(BasePipeline):
 
         video_files_rectified = [f for f in rectified_output.iterdir() if f.is_file()]
 
-        # Process with selected models
+        ##################################################
+        # Estimate human pose on videos
+        ##################################################
         models = self.config.pipeline.stages.pose_estimation.models
         for model_name in models:
             log_section(self.logger, f"{model_name}: Processing videos")
 
-            # Initialize YOLO estimator with dataset COCO manager
             pose_estimator = None
             if "yolo" in model_name.lower():
                 pose_estimator = YOLOPoseEstimator(
@@ -74,8 +74,10 @@ class VideoPipeline(BasePipeline):
                     confidence_threshold=self.config.models.yolo.confidence_threshold,
                 )
                 self.logger.info(f"Saved {model_name} video output: {output_path}")
-                
-
+            
+            ##################################################
+            # Triangulate human pose estimation from videos
+            ##################################################
             log_section(self.logger, f"{model_name}: Triangulate predicted 2D and visualize")
             cocos_json = list(Path(output_prediction).glob("*.json"))
             coco_manager = COCOManager(str(cocos_json[0]))

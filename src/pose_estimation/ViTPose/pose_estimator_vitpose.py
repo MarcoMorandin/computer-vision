@@ -27,8 +27,8 @@ class ViTPoseEstimator:
     def __init__(
         self,
         coco_manager: COCOManager,
-        detector_weights_path: str = "yolo11l.pt",
-        vit_model_name: str = "usyd-community/vitpose-plus-base",
+        detector_weights_path: str,
+        vit_model_name: str,
         prune_patterns: Optional[List[str]] = None
     ):
         """Initialize the ViTPoseEstimator.
