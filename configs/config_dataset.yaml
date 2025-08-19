@@ -1,6 +1,5 @@
 # Video Processing Configuration
 defaults:
-  - base@_here_: config
   - logging: default
   - models: default
   - paths: dataset
@@ -11,6 +10,9 @@ defaults:
 
 # Override mode for dataset processing
 mode: "dataset"
+
+project:
+  name: "pose_estimation_pipeline"
 
 hydra:
   output_subdir: null

@@ -76,17 +76,14 @@ class DatasetPipeline(BasePipeline):
             pose_estimator = YOLOPoseEstimator(
                 coco_manager=rectified_coco.copy(),
                 config=self.config,
-                model_weights_path=self.config.paths.weights.yolo_pose,
-                prune_patterns=["Foot"],
+                logger=self.logger,
             )
             output_predictions = out_folder_structure.yolo
         else:
             pose_estimator = ViTPoseEstimator(
                 coco_manager=rectified_coco.copy(),
                 config=self.config,
-                detector_weights_path=self.config.paths.weights.yolo_det,
-                vit_model_name=self.config.models.vit.model_name,
-                prune_patterns=["Foot"],
+                logger=self.logger,
             )
             output_predictions = out_folder_structure.vit
 

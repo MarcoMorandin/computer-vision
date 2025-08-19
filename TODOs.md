@@ -1,3 +1,3 @@
-- adding video streaming processing using mediapipe
 - implementing also uv
+- adding video streaming processing using mediapipe
 - final general verification

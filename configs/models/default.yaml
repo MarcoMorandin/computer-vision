@@ -7,6 +7,9 @@ confidence_threshold: 0.5  # Global default, can be overridden per model
 # Device settings (can be overridden globally or per model)
 device: "cpu"  # Options: "cuda", "cpu"
 
+keypoints:
+  prune_patterns: ["foot"]
+
 # YOLO Configuration
 yolo:
   # Model paths
@@ -22,3 +25,7 @@ vit:
   model_name: "usyd-community/vitpose-plus-base"  
   # Detection settings (uses YOLO for person detection)
   confidence_threshold: 0.5
+
+
+triangulation:
+  use_bundle_adjustment: True

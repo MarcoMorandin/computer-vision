@@ -29,12 +29,13 @@ class VideoPipeline(BasePipeline):
         ##################################################
         # Rectify Videos
         ##################################################
+        
         rectified_output = Path(self.config.paths.output.structure.rectified.root)
         
-        for video_path in video_files:            
-            self.logger.info(f"Rectifying video: {video_path}")
-            self.rectifier.rectify_video(video_path, rectified_output)
-            self.logger.info(f"Rectified video saved to: {rectified_output}")
+        # for video_path in video_files:            
+        #     self.logger.info(f"Rectifying video: {video_path}")
+        #     self.rectifier.rectify_video(video_path, rectified_output)
+        #     self.logger.info(f"Rectified video saved to: {rectified_output}")
 
         video_files_rectified = [f for f in rectified_output.iterdir() if f.is_file()]
 
@@ -50,6 +51,7 @@ class VideoPipeline(BasePipeline):
                 pose_estimator = YOLOPoseEstimator(
                     coco_manager=self.coco_dataset,
                     config=self.config,
+                    logger=self.logger,
                 )
                 output_prediction = Path(self.config.paths.output.structure.yolo.predictions.root)
                 output_triangulation = Path(self.config.paths.output.structure.yolo.triangulations.root)
@@ -57,13 +59,13 @@ class VideoPipeline(BasePipeline):
                 pose_estimator = ViTPoseEstimator(
                     coco_manager=self.coco_dataset,
                     config=self.config,
+                    logger=self.logger,
                 )
                 output_prediction = Path(self.config.paths.output.structure.vit.predictions.root)
                 output_triangulation = Path(self.config.paths.output.structure.vit.triangulations.root)
 
             for video_path in video_files_rectified:            
                 video_name = Path(video_path).stem
-                self.logger.info(f"Processing {video_path}")
                 output_path = output_prediction / Path(f"{video_name}_{model_name}.mp4")
                 output_path.parent.mkdir(parents=True, exist_ok=True)
                 

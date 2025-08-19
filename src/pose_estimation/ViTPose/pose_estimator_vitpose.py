@@ -1,5 +1,6 @@
 """ViTPose-based pose estimation module."""
 
+from logging import Logger
 import os
 import cv2
 import torch
@@ -26,6 +27,7 @@ class ViTPoseEstimator:
         self,
         coco_manager: COCOManager,
         config: Optional[Any] = None,
+        logger: Logger = None,
     ):
         """Initialize the ViTPoseEstimator.
 
@@ -38,6 +40,7 @@ class ViTPoseEstimator:
         """
         self.coco_manager = coco_manager
         self.config = config
+        self.logger = logger
 
         self.device = config.models.device
         detector_path = config.models.yolo.detection_model_path
@@ -54,7 +57,7 @@ class ViTPoseEstimator:
         
         
         # Determine prune patterns
-        patterns = config.keypoints.prune_patterns    
+        patterns = config.models.keypoints.prune_patterns    
         self.kept_keypoint_names = self.coco_manager.prune_keypoints(patterns)
         
         # Create keypoint mapping
@@ -120,7 +123,7 @@ class ViTPoseEstimator:
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             
-        fourcc = cv2.VideoWriter_fourcc("mp4v")
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
         
         # Get person category for annotations
@@ -133,7 +136,7 @@ class ViTPoseEstimator:
         
         self.logger.info(f"Processing video: {video_path}")
         
-        for frame_idx in tqdm(total_frames, desc="Running ViTPose Estimation", unit="frame"):
+        for frame_idx in tqdm(range(total_frames), desc="Running ViTPose Estimation", unit="frame"):
             _, frame = cap.read()
 
             filename = f"{Path(video_path).stem}_frame_{frame_idx:04d}.rf.jpg"

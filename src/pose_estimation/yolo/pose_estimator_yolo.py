@@ -5,6 +5,7 @@ import cv2
 from typing import List, Any, Optional
 from pathlib import Path
 
+from logging import Logger
 from tqdm import tqdm
 from ultralytics import YOLO
 
@@ -25,6 +26,7 @@ class YOLOPoseEstimator:
         self,
         coco_manager: COCOManager,
         config: Optional[Any] = None,
+        logger: Logger = None,
     ):
         """Initialize the YOLOPoseEstimator.
 
@@ -36,6 +38,7 @@ class YOLOPoseEstimator:
         """
         self.coco_manager = coco_manager
         self.config = config
+        self.logger = logger
         
         # Determine model weights path
         weights_path = config.models.yolo.pose_model_path
@@ -45,7 +48,7 @@ class YOLOPoseEstimator:
         self.device = config.models.device
         
         # Determine prune patterns
-        patterns = config.keypoints.prune_patterns
+        patterns = config.models.keypoints.prune_patterns
         self.kept_keypoint_names = self.coco_manager.prune_keypoints(patterns)
         
         # Create keypoint mapping
@@ -115,7 +118,7 @@ class YOLOPoseEstimator:
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
         # Get video codec from config
-        fourcc = cv2.VideoWriter_fourcc("mp4v")
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
         # Get person category for annotations
@@ -128,7 +131,7 @@ class YOLOPoseEstimator:
 
         self.logger.info(f"Processing video: {video_path}")
 
-        for frame_idx in tqdm(total_frames, desc="Running YoloPose Estimation", unit="frame"):
+        for frame_idx in tqdm(range(total_frames), desc="Running YoloPose Estimation", unit="frame"):
             _, frame = cap.read()
 
             results = self.model(frame, confidence_threshold, verbose=False, device=self.device)
@@ -142,7 +145,7 @@ class YOLOPoseEstimator:
             )
 
             # Process detections
-            keypoint = self._process_detections(results[0], img_id=img_id, category_id=category_id)
+            keypoint = self._process_detections(next(results), img_id=img_id, category_id=category_id)
 
             if keypoint is not None:
                 frame = drawer.draw_skeleton_on_image(frame, keypoint)
