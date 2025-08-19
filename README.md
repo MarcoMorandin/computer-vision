@@ -1,11 +1,11 @@
 run dataset
-python main.py --config-name=config_dataset
+uv run main.py --config-name=config_dataset
 
 run videos
-python main.py --config-name=config_video
+uv run main.py --config-name=config_video
 
 run dataset + video
-python main.py --config-name=config_multirun
+uv run main.py --config-name=config_multirun
 
 
 todo
