@@ -32,10 +32,10 @@ class VideoPipeline(BasePipeline):
         
         rectified_output = Path(self.config.paths.output.structure.rectified.root)
         
-        # for video_path in video_files:            
-        #     self.logger.info(f"Rectifying video: {video_path}")
-        #     self.rectifier.rectify_video(video_path, rectified_output)
-        #     self.logger.info(f"Rectified video saved to: {rectified_output}")
+        for video_path in video_files:            
+            self.logger.info(f"Rectifying video: {video_path}")
+            self.rectifier.rectify_video(video_path, rectified_output)
+            self.logger.info(f"Rectified video saved to: {rectified_output}")
 
         video_files_rectified = [f for f in rectified_output.iterdir() if f.is_file()]
 
