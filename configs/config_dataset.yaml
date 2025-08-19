@@ -1,38 +1,18 @@
-# Main configuration file
+# Video Processing Configuration
 defaults:
-  - paths: dataset
+  - base@_here_: config
+  - logging: default
   - models: default
+  - paths: dataset
   - pipeline: dataset
   - _self_
-  - override hydra/hydra_logging: disabled  
+  - override hydra/hydra_logging: disabled
   - override hydra/job_logging: disabled
 
-# Global settings
-project_name: "pose_estimation_pipeline"
-use_cuda: false
+# Override mode for dataset processing
+mode: "dataset"
 
-# Pipeline execution settings
-pipeline:
-  run_triangulation: true
-  run_pose_estimation: true
-  run_evaluation: true
-  use_bundle_adjustment: true
-  
-# Model selection
-models:
-  pose_estimators: ["yolo", "vit"]
-  
-# Keypoint settings
-keypoints:
-  prune_patterns: ["foot", "toe"]
-  confidence_threshold: 0.1
-  
-# Processing settings
-processing:
-  batch_size: 32
-  num_workers: 4
-
-hydra:  
-  output_subdir: null  
-  run:  
+hydra:
+  output_subdir: null
+  run:
     dir: .

@@ -2,20 +2,18 @@
 
 import os
 import cv2
-from typing import Dict, List, Any, Optional
+from typing import List, Any, Optional
 from pathlib import Path
 
 from tqdm import tqdm
-from ultralytics import YOLO, settings
+from ultralytics import YOLO
 
 from utils.skeleton.pose_plotter_2d import SkeletonDrawer
 
 from ...utils.dataset.coco_utils import COCOManager
 from ...utils.keypoints import (
     calculate_virtual_keypoints,
-    create_yolo_keypoint_mapping,
-    get_yolo_keypoint_names,
-    init_keypoints_dict
+    create_keypoint_mapping,
 )
 from ...utils.geometry import keypoints_to_flat_array
 
@@ -26,39 +24,45 @@ class YOLOPoseEstimator:
     def __init__(
         self,
         coco_manager: COCOManager,
-        model_weights_path: str = "yolo11l-pose.pt",
-        prune_patterns: Optional[List[str]] = None
+        config: Optional[Any] = None,
     ):
         """Initialize the YOLOPoseEstimator.
 
         Args:
             coco_manager: Initialized COCOManager object
-            model_weights_path: Path to YOLO pose model weights
-            prune_patterns: Keypoint patterns to prune (default: ["foot", "toe"])
+            config: Configuration object with YOLO settings
+            model_weights_path: Path to YOLO pose model weights (overrides config)
+            prune_patterns: Keypoint patterns to prune (overrides config)
         """
         self.coco_manager = coco_manager
-        self.model = YOLO(os.path.abspath(model_weights_path))
+        self.config = config
         
-        # Get standard YOLO keypoint names
-        self.yolo_keypoint_names = get_yolo_keypoint_names()
+        # Determine model weights path
+        weights_path = config.models.yolo.pose_model_path
+        self.model = YOLO(os.path.abspath(weights_path))
         
-        # Prune unwanted keypoints
-        prune_patterns = prune_patterns or ["foot", "toe"]
-        self.kept_keypoint_names = self.coco_manager.prune_keypoints(prune_patterns)
+        # Configure device
+        self.device = config.models.device
+        
+        # Determine prune patterns
+        patterns = config.keypoints.prune_patterns
+        self.kept_keypoint_names = self.coco_manager.prune_keypoints(patterns)
         
         # Create keypoint mapping
-        self.yolo_to_custom_mapping = create_yolo_keypoint_mapping(self.kept_keypoint_names)
+        self.yolo_to_custom_mapping = create_keypoint_mapping(self.kept_keypoint_names)
 
 
-    def run_pose_estimation(self, confidence_threshold: float = 0.25) -> COCOManager:
+    def run_pose_estimation(self) -> COCOManager:
         """Run pose estimation on images and update COCO dataset.
 
         Args:
-            confidence_threshold: Minimum confidence threshold for detections
+            confidence_threshold: Minimum confidence threshold for detections (uses config if None)
 
         Returns:
             Updated COCOManager object with new pose annotations
         """
+        # Determine confidence threshold
+        confidence_threshold = self.config.models.yolo.confidence_threshold
         images = self.coco_manager.get_images()
 
         # Clear all existing annotations
@@ -71,19 +75,11 @@ class YOLOPoseEstimator:
         for img in tqdm(images, desc="Running YOLO Pose Estimation", unit="image"):
             img_id = img["id"]
             file_name = img["file_name"]
-
-            if not os.path.exists(file_name):
-                print(f"  Warning: Image not found at {file_name}")
-                continue
-
+            
             image = cv2.imread(file_name)
-            if image is None:
-                print(f"  Warning: Could not load image {file_name}")
-                continue
-
-            # Run pose estimation
-            results = self.model(image, conf=confidence_threshold, verbose=False)
-
+                
+            results = self.model(image, conf=confidence_threshold, verbose=False, device=self.device)
+            
             # Process detections
             self._process_detections(results[0], img_id, category_id)
 
@@ -93,37 +89,33 @@ class YOLOPoseEstimator:
         self,
         video_path: str,
         output_path: str,
-        confidence_threshold: float = 0.25
     ) -> COCOManager:
         """
         Run pose estimation on video and create COCO dataset with predictions.
 
         Args:
             video_path: Path to input video
-            output_video_path: Path to save output video with predictions
-            video_coco_manager: COCOManager created from video frames
-            confidence_threshold: Minimum confidence threshold for detections
-            draw_predictions: Whether to draw keypoints and skeleton on video
+            output_path: Path to save output video with predictions
+            confidence_threshold: Minimum confidence threshold for detections (uses config if None)
             
         Returns:
             Updated COCOManager with pose predictions
         """
+        # Determine confidence threshold
+        confidence_threshold = self.config.models.yolo.confidence_threshold
         
         # Open video
         drawer = SkeletonDrawer(self.coco_manager)
         cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
-            raise ValueError(f"Could not open video: {video_path}")
 
         # Get video properties
         fps = int(cap.get(cv2.CAP_PROP_FPS))
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-        # Setup video writer if drawing predictions
-        out = None
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        
+        # Get video codec from config
+        fourcc = cv2.VideoWriter_fourcc("mp4v")
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
         # Get person category for annotations
@@ -134,23 +126,17 @@ class YOLOPoseEstimator:
         self.coco_manager.clear_annotations()
         self.coco_manager.clear_images()
 
-        frame_count = 0
-        print(f"Processing video: {video_path}")
-        print(f"Total frames: {total_frames}")
+        self.logger.info(f"Processing video: {video_path}")
 
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
+        for frame_idx in tqdm(total_frames, desc="Running YoloPose Estimation", unit="frame"):
+            _, frame = cap.read()
 
-            frame_count += 1
-            if frame_count % 30 == 0:  # Progress update every 30 frames
-                print(f"Processing frame {frame_count}/{total_frames}")
+            results = self.model(frame, confidence_threshold, verbose=False, device=self.device)
 
-            results = self.model(frame, conf=confidence_threshold, verbose=True)
-
+            filename = f"{Path(video_path).stem}_frame_{frame_idx:04d}.rf.jpg"
+            
             img_id = self.coco_manager.add_image(
-                file_name=f"{Path(video_path).stem}_frame_{frame_count:04d}.rf.jpg",
+                file_name=filename,
                 height=frame.shape[0],
                 width=frame.shape[1],
             )
@@ -191,7 +177,7 @@ class YOLOPoseEstimator:
             kpts_conf = keypoints_tensor.conf[person_idx].cpu().numpy()
 
             # Initialize custom keypoint dictionary
-            custom_kpts = init_keypoints_dict(self.kept_keypoint_names)
+            custom_kpts = {name: {"x": 0.0, "y": 0.0, "confidence": 0.0} for name in self.kept_keypoint_names}
 
             # Fill in available YOLO keypoints
             for custom_name, yolo_idx in self.yolo_to_custom_mapping.items():

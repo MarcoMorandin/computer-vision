@@ -114,20 +114,3 @@ class SkeletonDrawer:
             out_path = Path(output_dir) / path.name
             # Save result
             cv2.imwrite(str(out_path), image)
-
-
-def main():
-    """Example usage of SkeletonDrawer."""
-    
-    # Initialize COCO manager and drawer
-    coco_manager = COCOManager("")
-    drawer = SkeletonDrawer(coco_manager)
-    
-    # Process dataset
-    drawer.process_coco_dataset(
-        coco_manager
-    )
-
-
-if __name__ == '__main__':
-    main()

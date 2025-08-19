@@ -16,6 +16,8 @@ class DatasetPipeline(BasePipeline):
 
     def run(self) -> None:
         """Execute the complete dataset processing pipeline."""
+        pipeline_stages = self.config.pipeline.stages
+
         ##################################################
         # Rectify dataset
         ##################################################
@@ -38,7 +40,7 @@ class DatasetPipeline(BasePipeline):
 
         self.logger.info(f"Saved rectified annotations: {rectified_json_path}")
 
-        if self.config.pipeline.stages.rectification.save_visualizations:
+        if pipeline_stages.rectification.save_visualizations:
             SkeletonDrawer(rectified_coco).draw_skeleton_on_coco(
                 rectified_coco,
                 rectified_output.visualizations,
@@ -50,26 +52,30 @@ class DatasetPipeline(BasePipeline):
         ##################################################
         # Triangulate dataset
         ##################################################
-        self.process_triangulation(
-            model_name="Ground Truth",
-            predicted_coco=rectified_coco,
-            output_paths=self.config.paths.output.structure.ground_truth
-        )
+        if pipeline_stages.triangulation.enabled:
+            self.process_triangulation(
+                model_name="Ground Truth",
+                predicted_coco=rectified_coco,
+                output_paths=self.config.paths.output.structure.ground_truth
+            )
 
         ##################################################
         # Human Pose Estimation
         ##################################################
-        models = self.config.pipeline.stages.pose_estimation.models
-        for model_name in models:
-            self._process_hpe(model_name=model_name, rectified_coco=rectified_coco)
+        if pipeline_stages.pose_estimation.enabled:
+            models = pipeline_stages.pose_estimation.models
+            for model_name in models:
+                self._process_hpe(model_name=model_name, rectified_coco=rectified_coco)
 
     def _process_hpe(self, model_name, rectified_coco):
         """Process with HPE pose estimator."""
+        pipeline_stages = self.config.pipeline.stages
         log_section(self.logger, f"{model_name}: Pose estimation, visualization, and evaluation")
         out_folder_structure = self.config.paths.output.structure
         if "yolo" in model_name.lower():
             pose_estimator = YOLOPoseEstimator(
                 coco_manager=rectified_coco.copy(),
+                config=self.config,
                 model_weights_path=self.config.paths.weights.yolo_pose,
                 prune_patterns=["Foot"],
             )
@@ -77,15 +83,15 @@ class DatasetPipeline(BasePipeline):
         else:
             pose_estimator = ViTPoseEstimator(
                 coco_manager=rectified_coco.copy(),
+                config=self.config,
                 detector_weights_path=self.config.paths.weights.yolo_det,
                 vit_model_name=self.config.models.vit.model_name,
                 prune_patterns=["Foot"],
             )
             output_predictions = out_folder_structure.vit
 
-        predicted = pose_estimator.run_pose_estimation(
-            confidence_threshold=self.config.models.confidence_threshold
-        )
+        # Run pose estimation (confidence threshold now handled by estimator from config)
+        predicted = pose_estimator.run_pose_estimation()
 
         output_coco_path = Path(output_predictions.predictions.root) / "predicted.coco.json"
         predicted.save(str(output_coco_path))
@@ -93,7 +99,7 @@ class DatasetPipeline(BasePipeline):
         self.logger.info(f"Saved {model_name} predictions: {output_coco_path}")
 
        
-        if self.config.pipeline.stages.pose_estimation.save_visualizations:
+        if pipeline_stages.pose_estimation.save_visualizations:
             SkeletonDrawer(predicted).draw_skeleton_on_coco(
                 predicted, output_predictions.predictions.visualizations
             )
@@ -109,7 +115,7 @@ class DatasetPipeline(BasePipeline):
         ##################################################
         # Evaluate Human Pose Estimation Results
         ##################################################
-        if self.config.pipeline.stages.evaluation.enabled:
+        if pipeline_stages.pose_estimation.evaluation.enabled:
             self.evaluator.evaluate(
                 gt_manager=rectified_coco_pruned,
                 pred_manager=predicted,
@@ -122,10 +128,11 @@ class DatasetPipeline(BasePipeline):
         ##################################################
         # Triangulate Human Pose Estimation Results
         ##################################################
-        self.process_triangulation(
-            model_name=model_name,
-            predicted_coco=predicted,
-            output_paths=output_predictions,
-        )
+        if pipeline_stages.pose_estimation.triangulation.enabled:
+            self.process_triangulation(
+                model_name=model_name,
+                predicted_coco=predicted,
+                output_paths=output_predictions,
+            )
 
     

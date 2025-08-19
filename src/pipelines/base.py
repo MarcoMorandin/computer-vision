@@ -55,12 +55,13 @@ class BasePipeline:
         skeleton_json_path = Path(output_root) / "player_3d_poses.json"
         skeleton_manager.save(str(skeleton_json_path))
         self.logger.info(f"Saved 3D skeletons: {skeleton_json_path}")
-
-        animation_path = Path(output_visuals) / "3d_pose_animation.mp4"
-        PosePlotter3D(coco_manager, skeleton_manager).animate_frames(
-            save=str(animation_path)
-        )
-        self.logger.info(f"Saved 3D pose animation: {animation_path}")
+        
+        if self.config.pipeline.stages.triangulation.save_visualizations:
+            animation_path = Path(output_visuals) / "3d_pose_animation.mp4"
+            PosePlotter3D(coco_manager, skeleton_manager).animate_frames(
+                save=str(animation_path)
+            )
+            self.logger.info(f"Saved 3D pose animation: {animation_path}")
 
         return skeleton_manager
     
@@ -85,7 +86,7 @@ class BasePipeline:
             )
             self.logger.info(f"Saved reprojected visualizations to: {output_visuals}")
 
-        if self.config.pipeline.stages.evaluation.enabled:
+        if self.config.pipeline.stages.reprojection.evaluation.enabled:
             self.evaluator.evaluate(
                 gt_manager=gt_coco,
                 pred_manager=reprojected_coco,

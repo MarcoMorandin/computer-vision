@@ -14,9 +14,7 @@ from utils.skeleton.pose_plotter_2d import SkeletonDrawer
 from ...utils.dataset.coco_utils import COCOManager
 from ...utils.keypoints import (
     calculate_virtual_keypoints,
-    create_vitpose_keypoint_mapping,
-    get_vitpose_keypoint_names,
-    init_keypoints_dict
+    create_keypoint_mapping,
 )
 from ...utils.geometry import keypoints_to_flat_array
 
@@ -27,48 +25,52 @@ class ViTPoseEstimator:
     def __init__(
         self,
         coco_manager: COCOManager,
-        detector_weights_path: str,
-        vit_model_name: str,
-        prune_patterns: Optional[List[str]] = None
+        config: Optional[Any] = None,
     ):
         """Initialize the ViTPoseEstimator.
 
         Args:
             coco_manager: Initialized COCOManager object
-            detector_weights_path: Path to YOLO model weights for person detection
-            vit_model_name: HuggingFace ViTPose model repository name
-            prune_patterns: Keypoint patterns to prune (default: ["foot", "toe"])
+            config: Configuration object with ViTPose settings
+            detector_weights_path: Path to YOLO model weights for person detection (overrides config)
+            vit_model_name: HuggingFace ViTPose model repository name (overrides config)
+            prune_patterns: Keypoint patterns to prune (overrides config)
         """
         self.coco_manager = coco_manager
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.config = config
+
+        self.device = config.models.device
+        detector_path = config.models.yolo.detection_model_path
+        model_name = config.models.vit.model_name
         
         # Initialize models
-        self.detector = YOLO(os.path.abspath(detector_weights_path))
+        self.detector = YOLO(os.path.abspath(detector_path))
         self.detector.to(self.device)
         
-        self.processor = AutoProcessor.from_pretrained(vit_model_name, use_fast=False)
-        self.vit_model = VitPoseForPoseEstimation.from_pretrained(vit_model_name).to(self.device)
+        # Configure processor settings
+        self.processor = AutoProcessor.from_pretrained(model_name, use_fast=False)
+        self.vit_model = VitPoseForPoseEstimation.from_pretrained(model_name).to(self.device)
         self.vit_model.eval()
         
-        # Get standard ViTPose keypoint names
-        self.vit_keypoint_names = get_vitpose_keypoint_names()
         
-        # Prune unwanted keypoints
-        prune_patterns = prune_patterns or ["foot", "toe"]
-        self.kept_keypoint_names = self.coco_manager.prune_keypoints(prune_patterns)
+        # Determine prune patterns
+        patterns = config.keypoints.prune_patterns    
+        self.kept_keypoint_names = self.coco_manager.prune_keypoints(patterns)
         
         # Create keypoint mapping
-        self.vit_to_custom_mapping = create_vitpose_keypoint_mapping(self.kept_keypoint_names)
+        self.vit_to_custom_mapping = create_keypoint_mapping(self.kept_keypoint_names)
 
-    def run_pose_estimation(self, confidence_threshold: float = 0.5) -> COCOManager:
+    def run_pose_estimation(self, confidence_threshold: Optional[float] = None) -> COCOManager:
         """Run pose estimation on images and update COCO dataset.
 
         Args:
-            confidence_threshold: Minimum confidence threshold for detections
+            confidence_threshold: Minimum confidence threshold for detections (uses config if None)
 
         Returns:
             Updated COCOManager object with new pose annotations
         """
+        # Determine confidence threshold
+        confidence_threshold = self.config.models.vit.confidence_threshold
         images = self.coco_manager.get_images()
         
         # Clear all existing annotations
@@ -82,14 +84,8 @@ class ViTPoseEstimator:
             img_id = img["id"]
             file_name = img["file_name"]
             
-            if not os.path.exists(file_name):
-                print(f"  Warning: Image not found at {file_name}")
-                continue
-            
+           
             image = cv2.imread(file_name)
-            if image is None:
-                print(f"  Warning: Could not load image {file_name}")
-                continue
             
             # Run pose estimation
             self._process_frame(image, img_id, category_id, confidence_threshold)
@@ -100,32 +96,31 @@ class ViTPoseEstimator:
         self,
         video_path: str,
         output_path: str,
-        confidence_threshold: float = 0.5
     ) -> COCOManager:
         """Run pose estimation on video and create COCO dataset with predictions.
 
         Args:
             video_path: Path to input video
             output_path: Path to save output video with predictions
-            confidence_threshold: Minimum confidence threshold for detections
+            confidence_threshold: Minimum confidence threshold for detections (uses config if None)
 
         Returns:
             Updated COCOManager with pose predictions
         """
+        # Determine confidence threshold
+        confidence_threshold = self.config.models.vit.confidence_threshold
+        
         # Open video
         drawer = SkeletonDrawer(self.coco_manager)
         cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
-            raise ValueError(f"Could not open video: {video_path}")
         
         # Get video properties
         fps = int(cap.get(cv2.CAP_PROP_FPS))
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        
-        # Setup video writer
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            
+        fourcc = cv2.VideoWriter_fourcc("mp4v")
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
         
         # Get person category for annotations
@@ -136,22 +131,16 @@ class ViTPoseEstimator:
         self.coco_manager.clear_annotations()
         self.coco_manager.clear_images()
         
-        frame_count = 0
-        print(f"Processing video: {video_path}")
-        print(f"Total frames: {total_frames}")
+        self.logger.info(f"Processing video: {video_path}")
         
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            
-            frame_count += 1
-            if frame_count % 30 == 0:  # Progress update every 30 frames
-                print(f"Processing frame {frame_count}/{total_frames}")
-            
+        for frame_idx in tqdm(total_frames, desc="Running ViTPose Estimation", unit="frame"):
+            _, frame = cap.read()
+
+            filename = f"{Path(video_path).stem}_frame_{frame_idx:04d}.rf.jpg"
+
             # Add image to COCO dataset
             img_id = self.coco_manager.add_image(
-                file_name=f"{Path(video_path).stem}_frame_{frame_count:04d}.rf.jpg",
+                file_name=filename,
                 height=frame.shape[0],
                 width=frame.shape[1],
             )
@@ -187,8 +176,8 @@ class ViTPoseEstimator:
         Returns:
             First person's keypoints as flat array, or None if no detections
         """
-        # Detect persons with YOLO
-        det_results = self.detector(frame, conf=confidence_threshold, imgsz=1280, verbose=False)
+        # Detect persons with YOLO with configuration options
+        det_results = self.detector(frame, conf=confidence_threshold, verbose=False)
         det = det_results[0]
         
         if det.boxes is None or det.boxes.xyxy.shape[0] == 0:
@@ -214,7 +203,7 @@ class ViTPoseEstimator:
         
         # Run ViTPose inference
         inputs = self.processor(pil_img, boxes=[boxes_xywh], return_tensors="pt").to(self.device)
-        dataset_index = torch.tensor([0], device=self.device)  # 0 = COCO dataset
+        dataset_index = torch.tensor([0], device=self.device)
         
         with torch.no_grad():
             outputs = self.vit_model(**inputs, dataset_index=dataset_index)
@@ -239,7 +228,7 @@ class ViTPoseEstimator:
                 kpts_conf = kpts_conf.detach().cpu().numpy()
             
             # Initialize custom keypoint dictionary
-            custom_kpts = init_keypoints_dict(self.kept_keypoint_names)
+            custom_kpts = {name: {"x": 0.0, "y": 0.0, "confidence": 0.0} for name in self.kept_keypoint_names}
             
             # Fill in available ViTPose keypoints
             for custom_name, vit_idx in self.vit_to_custom_mapping.items():

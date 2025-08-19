@@ -125,8 +125,6 @@ class COCOManager:
         """
         person_cat = self.get_person_category()
         original_kpts = person_cat.get("keypoints", [])
-        if not original_kpts:
-            return []
 
         # Decide which keypoint names to keep
         kept_kpts = [

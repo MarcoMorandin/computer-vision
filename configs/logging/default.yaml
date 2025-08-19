@@ -1,0 +1,6 @@
+# @package logging
+
+# Root Logger Settings
+root:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  propagate: false

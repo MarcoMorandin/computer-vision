@@ -1,29 +1,16 @@
-# Video processing configuration file
+# Video Processing Configuration
 defaults:
-  - paths: video
+  - base@_here_: config
+  - logging: default
   - models: default
+  - paths: video
   - pipeline: video
   - _self_
   - override hydra/hydra_logging: disabled
   - override hydra/job_logging: disabled
 
-# Global settings
-project_name: "pose_estimation_pipeline"
-use_cuda: true
-random_seed: 42
-
-# Processing mode
-mode: "video"  # Can be "dataset" or "video"
-
-# Keypoint settings
-keypoints:
-  prune_patterns: ["foot", "toe"]
-  confidence_threshold: 0.1
-  
-# Processing settings
-processing:
-  batch_size: 16               # Smaller batch for video processing
-  num_workers: 2
+# Override mode for video processing
+mode: "video"
 
 hydra:
   output_subdir: null

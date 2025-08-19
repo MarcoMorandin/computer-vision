@@ -12,11 +12,6 @@ data:
     - "data/videos/out5.mp4"
     - "data/videos/out7.mp4"
 
-
-weights:
-  yolo_pose: "weights/yolo11s-pose.pt"
-  yolo_det: "weights/yolo11s.pt"
-
 output:
   base_dir: "output/video"
   structure:

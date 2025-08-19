@@ -4,10 +4,6 @@ data:
   dataset_json: "data/dataset/_annotations.coco.json"
   input_images_dir: "data/dataset"
 
-weights:
-  yolo_pose: "weights/yolo11s-pose.pt"
-  yolo_det: "weights/yolo11s.pt"
-
 output:
   base_dir: "output"
   structure:

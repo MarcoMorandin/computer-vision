@@ -49,15 +49,14 @@ class VideoPipeline(BasePipeline):
             if "yolo" in model_name.lower():
                 pose_estimator = YOLOPoseEstimator(
                     coco_manager=self.coco_dataset,
-                    model_weights_path=self.config.paths.weights.yolo_pose,
+                    config=self.config,
                 )
                 output_prediction = Path(self.config.paths.output.structure.yolo.predictions.root)
                 output_triangulation = Path(self.config.paths.output.structure.yolo.triangulations.root)
             else:
                 pose_estimator = ViTPoseEstimator(
                     coco_manager=self.coco_dataset,
-                    detector_weights_path=self.config.paths.weights.yolo_det,
-                    vit_model_name=self.config.models.vit.model_name,
+                    config=self.config,
                 )
                 output_prediction = Path(self.config.paths.output.structure.vit.predictions.root)
                 output_triangulation = Path(self.config.paths.output.structure.vit.triangulations.root)
@@ -68,24 +67,25 @@ class VideoPipeline(BasePipeline):
                 output_path = output_prediction / Path(f"{video_name}_{model_name}.mp4")
                 output_path.parent.mkdir(parents=True, exist_ok=True)
                 
+                # Run pose estimation (confidence threshold now handled by estimator from config)
                 pose_estimator.run_pose_estimation_on_video(
                     video_path=video_path,
                     output_path=output_path,
-                    confidence_threshold=self.config.models.yolo.confidence_threshold,
                 )
                 self.logger.info(f"Saved {model_name} video output: {output_path}")
             
             ##################################################
             # Triangulate human pose estimation from videos
             ##################################################
-            log_section(self.logger, f"{model_name}: Triangulate predicted 2D and visualize")
-            cocos_json = list(Path(output_prediction).glob("*.json"))
-            coco_manager = COCOManager(str(cocos_json[0]))
-            for coco_json in cocos_json[1:]:
-                coco_manager.merge([COCOManager(str(coco_json))])
+            if self.config.pipeline.stages.triangulation.enabled:
+                log_section(self.logger, f"{model_name}: Triangulate predicted 2D and visualize")
+                cocos_json = list(Path(output_prediction).glob("*.json"))
+                coco_manager = COCOManager(str(cocos_json[0]))
+                for coco_json in cocos_json[1:]:
+                    coco_manager.merge([COCOManager(str(coco_json))])
 
-            self.triangulate_and_visualize(
-                coco_manager=coco_manager,
-                output_root=output_triangulation,
-                output_visuals=output_triangulation
-            )
+                self.triangulate_and_visualize(
+                    coco_manager=coco_manager,
+                    output_root=output_triangulation,
+                    output_visuals=output_triangulation
+                )

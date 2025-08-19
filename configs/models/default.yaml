@@ -1,21 +1,24 @@
 # @package models
-confidence_threshold: 0.5
+# Model Configuration with Enhanced Parameter Coverage
 
+# Global model settings
+confidence_threshold: 0.5  # Global default, can be overridden per model
+
+# Device settings (can be overridden globally or per model)
+device: "cpu"  # Options: "cuda", "cpu"
+
+# YOLO Configuration
 yolo:
+  # Model paths
   pose_model_path: "weights/yolo11s-pose.pt"
   detection_model_path: "weights/yolo11s.pt"
-  device: "cpu"  # or "cpu"
+  
+  # Inference settings
+  confidence_threshold: 0.25  # Override global for YOLO
 
+# ViTPose Configuration  
 vit:
-  model_name: "usyd-community/vitpose-plus-base"
-  device: "cpu"  # or "cpu"
-
-triangulation:
-  min_views: 2
-  use_bundle_adjustment: true
-  optimization_method: "lm"  # Levenberg-Marquardt
-
-evaluation:
-  metrics: ["pck", "pckh", "auc"]
-  pck_threshold: 0.2
-  save_plots: true
+  # Model settings
+  model_name: "usyd-community/vitpose-plus-base"  
+  # Detection settings (uses YOLO for person detection)
+  confidence_threshold: 0.5
