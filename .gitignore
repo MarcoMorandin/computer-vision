@@ -5,3 +5,4 @@ data/videos
 output/
 __pycache__/
 weights/
+uv.lock
