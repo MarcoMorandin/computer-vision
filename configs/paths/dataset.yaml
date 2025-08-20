@@ -1,6 +1,6 @@
 # @package paths
 data:
-  camera_calib_dir: "data/camera_data_v2"
+  camera_calib_dir: "data/camera_data_v3"
   dataset_json: "data/dataset/_annotations.coco.json"
   input_images_dir: "data/dataset"
 
