@@ -130,6 +130,7 @@ class DatasetPipeline(BasePipeline):
                 model_name=model_name,
                 predicted_coco=predicted,
                 output_paths=output_predictions,
+                gt_coco=rectified_coco_pruned
             )
 
     
