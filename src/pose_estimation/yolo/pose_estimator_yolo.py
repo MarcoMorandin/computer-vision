@@ -65,7 +65,7 @@ class YOLOPoseEstimator:
             Updated COCOManager object with new pose annotations
         """
         # Determine confidence threshold
-        confidence_threshold = self.config.models.confidence_threshold
+        confidence_threshold = self.config.models.yolo.confidence_threshold
         images = self.coco_manager.get_images()
 
         # Clear all existing annotations
@@ -105,7 +105,7 @@ class YOLOPoseEstimator:
             Updated COCOManager with pose predictions
         """
         # Determine confidence threshold
-        confidence_threshold = self.config.models.confidence_threshold
+        confidence_threshold = self.config.models.yolo.confidence_threshold
         
         # Open video
         drawer = SkeletonDrawer(self.coco_manager)

@@ -43,7 +43,7 @@ class ViTPoseEstimator:
         self.logger = logger
 
         self.device = config.models.device
-        detector_path = config.models.yolo.detection_model_path
+        detector_path = config.models.vit.detection_model_path
         model_name = config.models.vit.model_name
         
         # Initialize models
@@ -73,7 +73,7 @@ class ViTPoseEstimator:
             Updated COCOManager object with new pose annotations
         """
         # Determine confidence threshold
-        confidence_threshold = self.config.models.confidence_threshold
+        confidence_threshold = self.config.models.vit.confidence_threshold
         images = self.coco_manager.get_images()
         
         # Clear all existing annotations
@@ -111,7 +111,7 @@ class ViTPoseEstimator:
             Updated COCOManager with pose predictions
         """
         # Determine confidence threshold
-        confidence_threshold = self.config.models.confidence_threshold
+        confidence_threshold = self.config.models.vit.confidence_threshold
         
         # Open video
         drawer = SkeletonDrawer(self.coco_manager)
