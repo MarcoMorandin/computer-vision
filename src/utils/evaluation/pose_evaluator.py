@@ -178,27 +178,29 @@ class PoseEvaluator:
         missing_detections = sum(1 for m in matches if m["missing_detection"])
         successful_detections = len(matches) - missing_detections
         detection_rate = successful_detections / len(matches) if matches else 0.0
-
+        counter = 0
+        
         for m in tqdm(matches, desc="Evaluating"):
             gt = m["gt_keypoints"]
             pred = m["pred_keypoints"]
-
-            # PCKh
-            metrics_store["pckh_0.1"].append(self.compute_pck(gt, pred, 0.1))
-            metrics_store["pckh_0.2"].append(self.compute_pck(gt, pred, 0.2))
-            metrics_store["pckh_0.5"].append(self.compute_pck(gt, pred, 0.5))
-            
-            # MPJPE / PA-MPJPE
-            mpjpe = self.compute_mpjpe(gt, pred)
-            
-            # Handle PA-MPJPE for missing detections    
-            aligned = self.procrustes_alignment(gt, pred)
-            pred_aligned = pred.copy()
-            pred_aligned[:, :2] = aligned
-            pa_mpjpe = self.compute_mpjpe(gt, pred_aligned)
-            
-            metrics_store["mpjpe"].append(mpjpe)
-            metrics_store["pa_mpjpe"].append(pa_mpjpe)
+            if not m["missing_detection"]:
+                # PCKh
+                metrics_store["pckh_0.1"].append(self.compute_pck(gt, pred, 0.1))
+                metrics_store["pckh_0.2"].append(self.compute_pck(gt, pred, 0.2))
+                metrics_store["pckh_0.5"].append(self.compute_pck(gt, pred, 0.5))
+                
+                # MPJPE / PA-MPJPE
+                mpjpe = self.compute_mpjpe(gt, pred)
+                
+                # Handle PA-MPJPE for missing detections    
+                aligned = self.procrustes_alignment(gt, pred)
+                pred_aligned = pred.copy()
+                pred_aligned[:, :2] = aligned
+                pa_mpjpe = self.compute_mpjpe(gt, pred_aligned)
+                
+                metrics_store["mpjpe"].append(mpjpe)
+                metrics_store["pa_mpjpe"].append(pa_mpjpe)
+                counter += 1
 
         results = {
             "overall": {
@@ -207,7 +209,7 @@ class PoseEvaluator:
                 "PCKh@0.5": float(np.mean(metrics_store["pckh_0.5"])),
                 "MPJPE": float(np.mean(metrics_store["mpjpe"])),
                 "PA-MPJPE": float(np.mean(metrics_store["pa_mpjpe"])),
-                "num_samples": len(matches),
+                "num_samples": counter,
             },
             "detection_stats": {
                 "total_ground_truth_samples": len(matches),
