@@ -65,13 +65,13 @@ class BasePipeline:
 
         return skeleton_manager
     
-    def reproject_draw_and_eval(self, gt_coco: COCOManager, skeleton_manager: Any,
+    def reproject_draw_and_eval(self, predicted_coco: COCOManager, skeleton_manager: Any,
                                output_root: str, output_visuals: str, 
-                               eval_output_dir: str) -> COCOManager:
+                               eval_output_dir: str, gt_coco: COCOManager = None) -> COCOManager:
         """Reproject 3D poses to 2D, create visualizations, and evaluate."""
         reprojector = SkeletonReprojector(
             camera_manager=self.camera_manager,
-            coco_manager=gt_coco.copy(),
+            coco_manager=predicted_coco.copy(),
             skeleton_manager=skeleton_manager,
         )
         reprojected_coco = reprojector.reproject()
@@ -88,7 +88,7 @@ class BasePipeline:
 
         if self.config.pipeline.stages.reprojection.evaluation.enabled:
             self.evaluator.evaluate(
-                gt_manager=gt_coco,
+                gt_manager=gt_coco if gt_coco else predicted_coco,
                 pred_manager=reprojected_coco,
                 output_dir=eval_output_dir,
             )
@@ -98,7 +98,7 @@ class BasePipeline:
     
     
     def process_triangulation(
-        self, model_name, predicted_coco, output_paths
+        self, model_name: str, predicted_coco: COCOManager, output_paths: str, gt_coco: COCOManager = None
     ):
         """Process triangulation and reprojection for a model."""
         log_section(
@@ -114,9 +114,10 @@ class BasePipeline:
             self.logger, f"{model_name}: Reproject 3D -> 2D, visualize, and evaluate"
         )
         self.reproject_draw_and_eval(
-            gt_coco=predicted_coco,
+            predicted_coco=predicted_coco,
             skeleton_manager=model_skeletons,
             output_root=output_paths.reprojections.root,
             output_visuals=output_paths.reprojections.visualizations,
             eval_output_dir=output_paths.evaluations.reprojections,
+            gt_coco=gt_coco
         )
