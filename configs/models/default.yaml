@@ -2,7 +2,7 @@
 # Model Configuration with Enhanced Parameter Coverage
 
 # Global model settings
-confidence_threshold: 0.5  # Global default, can be overridden per model
+confidence_threshold: 0.7  # Global default, can be overridden per model
 
 # Device settings (can be overridden globally or per model)
 device: "cpu"  # Options: "cuda", "cpu"
@@ -13,8 +13,8 @@ keypoints:
 # YOLO Configuration
 yolo:
   # Model paths
-  pose_model_path: "weights/yolo11l-pose.pt"
-  detection_model_path: "weights/yolo11l.pt"
+  pose_model_path: "weights/yolo11x-pose.pt"
+  detection_model_path: "weights/yolo11x.pt"
 
 # ViTPose Configuration  
 vit:
@@ -23,4 +23,4 @@ vit:
 
 
 triangulation:
-  use_bundle_adjustment: True
+  use_bundle_adjustment: False
