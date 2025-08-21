@@ -20,8 +20,8 @@ yolo:
 vit:
   # Model settings
   model_name: "usyd-community/vitpose-plus-huge"  
-  detection_model_path: "weights/yolo12x.pt"
-  confidence_threshold: 0.5
+  detection_model_path: "weights/yolov8x-worldv2.pt"
+  confidence_threshold: 0.7
 
 triangulation:
   use_bundle_adjustment: False
