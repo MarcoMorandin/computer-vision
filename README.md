@@ -12,6 +12,8 @@ This project implements an end-to-end pipeline that transforms multi-view 2D hum
 
 **Annotated Dataset Pipeline**
 
+*Note: in order to correctly view these diagram in VS code install the following extension: [Markdown Preview Mermaid Support](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid)*
+
 ```mermaid
 graph LR
     A[Annotated Dataset] --> B[Rectification]
