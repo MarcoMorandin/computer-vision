@@ -49,6 +49,8 @@ class ViTPoseEstimator:
         # Initialize models
         self.detector = YOLO(os.path.abspath(detector_path))
         self.detector.to(self.device)
+        self.detector.set_classes(["person"])
+
         
         # Configure processor settings
         self.processor = AutoProcessor.from_pretrained(model_name, use_fast=False)
@@ -180,7 +182,7 @@ class ViTPoseEstimator:
             First person's keypoints as flat array, or None if no detections
         """
         # Detect persons with YOLO with configuration options
-        det_results = self.detector(frame, conf=confidence_threshold, verbose=False)
+        det_results = self.detector.predict(frame, conf=confidence_threshold, verbose=False, device=self.device)
         det = det_results[0]
         
         if det.boxes is None or det.boxes.xyxy.shape[0] == 0:

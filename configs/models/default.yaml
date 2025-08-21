@@ -19,9 +19,9 @@ yolo:
 # ViTPose Configuration  
 vit:
   # Model settings
-  model_name: "usyd-community/vitpose-plus-large"  
-  detection_model_path: "weights/yolo11x.pt"
-  confidence_threshold: 0.5
+  model_name: "usyd-community/vitpose-plus-huge"  
+  detection_model_path: "weights/yolov8x-worldv2.pt"
+  confidence_threshold: 0.4
 
 triangulation:
   use_bundle_adjustment: False
