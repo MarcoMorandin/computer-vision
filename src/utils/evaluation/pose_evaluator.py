@@ -1,3 +1,8 @@
+"""Evaluation utilities for 2D pose predictions against COCO ground truth.
+
+Computes PCKh, MPJPE (2D pixel error), and Procrustes-aligned MPJPE.
+"""
+
 import os
 import json
 from typing import Dict, List, Tuple
@@ -8,9 +13,10 @@ from src.utils.dataset.coco_utils import COCOManager
 
 
 class PoseEvaluator:
-    """
-    Pose evaluation using COCOManager.
-    Computes PCKh, MPJPE, PA-MPJPE between a GT COCO dataset and a prediction/reprojection COCO dataset.
+    """Evaluate predicted/reprojected keypoints against ground truth.
+
+    Uses COCOManager instances for ground truth and predictions to compute
+    standard 2D metrics: PCKh, MPJPE, and PA-MPJPE (after Procrustes alignment).
     """
 
     def __init__(self):
@@ -19,6 +25,21 @@ class PoseEvaluator:
     def get_matching_annotations(
         self, gt_manager: COCOManager, pred_manager: COCOManager
     ) -> List[Dict]:
+        """Build a list of GT/prediction pairs aligned by filename.
+
+        Parameters
+        ----------
+        gt_manager : COCOManager
+            Ground-truth dataset.
+        pred_manager : COCOManager
+            Prediction or reprojection dataset.
+
+        Returns
+        -------
+        list[dict]
+            Each entry contains filename, camera, frame, gt_keypoints, pred_keypoints,
+            and a missing_detection flag when no prediction exists.
+        """
         matches = []
 
         gt_cat_id = gt_manager.get_person_category().get("id")
@@ -26,7 +47,7 @@ class PoseEvaluator:
 
         # Build filename -> image_id map for both GT and predictions
         pred_lookup = {img["file_name"]: img["id"] for img in pred_manager.get_images()}
-        
+
         # Process all GT images to include missing detections
         for gt_img in gt_manager.get_images():
             filename = gt_img["file_name"]
@@ -38,7 +59,7 @@ class PoseEvaluator:
                 for ann in gt_manager.get_annotations_by_image_id(gt_img_id)
                 if ann["category_id"] == gt_cat_id
             ]
-            
+
             if not gt_anns:
                 continue  # Skip if no ground truth person in this image
 
@@ -53,7 +74,7 @@ class PoseEvaluator:
                     for ann in pred_manager.get_annotations_by_image_id(pred_img_id)
                     if ann["category_id"] == pred_cat_id
                 ]
-                
+
                 if pred_anns:
                     # Normal case: both GT and prediction exist
                     pred_ann = pred_anns[0]
@@ -62,8 +83,12 @@ class PoseEvaluator:
                             "filename": filename,
                             "camera": cam,
                             "frame": frame,
-                            "gt_keypoints": np.array(gt_ann["keypoints"]).reshape(-1, 3),
-                            "pred_keypoints": np.array(pred_ann["keypoints"]).reshape(-1, 3),
+                            "gt_keypoints": np.array(gt_ann["keypoints"]).reshape(
+                                -1, 3
+                            ),
+                            "pred_keypoints": np.array(pred_ann["keypoints"]).reshape(
+                                -1, 3
+                            ),
                             "missing_detection": False,
                         }
                     )
@@ -74,16 +99,19 @@ class PoseEvaluator:
                             "filename": filename,
                             "camera": cam,
                             "frame": frame,
-                            "gt_keypoints": np.array(gt_ann["keypoints"]).reshape(-1, 3),
+                            "gt_keypoints": np.array(gt_ann["keypoints"]).reshape(
+                                -1, 3
+                            ),
                             "pred_keypoints": None,  # No prediction available
                             "missing_detection": True,
                         }
                     )
-            
+
         return matches
 
     @staticmethod
     def extract_camera_info(filename: str) -> Tuple[str, int]:
+        """Parse camera id and frame index from a filename like out3_frame_0123.*"""
         parts = filename.split("_")
         if len(parts) >= 3:
             camera = parts[0].replace("out", "")
@@ -98,25 +126,32 @@ class PoseEvaluator:
 
     @staticmethod
     def compute_head_size(keypoints: np.ndarray) -> float:
+        """Estimate head size for PCKh normalization.
+
+        Uses the distance between left and right hips as a fallback proxy
+        if available; otherwise returns a fixed default.
+        """
         if keypoints.shape[0] > 11 and keypoints[11, 2] > 0 and keypoints[10, 2] > 0:
             d = np.linalg.norm(keypoints[11, :2] - keypoints[10, :2])
             return max(d, 1.0)
         return 60.0
 
     def compute_pck(self, gt_kpts, pred_kpts, threshold) -> float:
+        """Compute Percentage of Correct Keypoints (normalized by head size)."""
         valid = (gt_kpts[:, 2] > 0) & (pred_kpts[:, 2] > 0)
         if not np.any(valid):
             return 0.0
         dists = np.linalg.norm(gt_kpts[:, :2] - pred_kpts[:, :2], axis=1)
-       
+
         norm_factor = self.compute_head_size(gt_kpts)
-       
+
         thr_pixels = threshold * norm_factor
         correct = (dists <= thr_pixels) & valid
         return float(np.sum(correct) / np.sum(valid))
 
     @staticmethod
     def compute_mpjpe(gt_kpts, pred_kpts) -> float:
+        """Compute mean per-joint position error (in pixels) over visible joints."""
         valid = (gt_kpts[:, 2] > 0) & (pred_kpts[:, 2] > 0)
         if not np.any(valid):
             return float("inf")
@@ -124,7 +159,8 @@ class PoseEvaluator:
         return float(np.mean(dists[valid]))
 
     @staticmethod
-    def procrustes_alignment(gt_kpts, pred_kpts):        
+    def procrustes_alignment(gt_kpts, pred_kpts):
+        """Align predicted keypoints to GT via similarity transform (2D Procrustes)."""
         valid = (gt_kpts[:, 2] > 0) & (pred_kpts[:, 2] > 0)
         if np.sum(valid) < 3:
             return pred_kpts[:, :2]
@@ -150,17 +186,21 @@ class PoseEvaluator:
         pred_manager: COCOManager,
         output_dir: str,
     ) -> Dict:
-        """
-        Evaluate prediction (or reprojection) keypoints against ground truth.
+        """Evaluate predicted keypoints against ground truth and save metrics.
 
-        Args:
-            gt_manager: COCOManager for ground truth annotations
-            pred_manager: COCOManager for predicted/reprojected annotations
-            output_dir: directory to store results JSON
-            output_filename: name of the results file
+        Parameters
+        ----------
+        gt_manager : COCOManager
+            Ground-truth dataset.
+        pred_manager : COCOManager
+            Predicted/reprojected dataset to evaluate.
+        output_dir : str
+            Directory where evaluation_results.json will be written.
 
-        Returns:
-            Dict with aggregated metrics.
+        Returns
+        -------
+        dict
+            Aggregated metrics and detection statistics.
         """
         os.makedirs(output_dir, exist_ok=True)
 
@@ -179,7 +219,7 @@ class PoseEvaluator:
         successful_detections = len(matches) - missing_detections
         detection_rate = successful_detections / len(matches) if matches else 0.0
         counter = 0
-        
+
         for m in tqdm(matches, desc="Evaluating"):
             gt = m["gt_keypoints"]
             pred = m["pred_keypoints"]
@@ -188,16 +228,16 @@ class PoseEvaluator:
                 metrics_store["pckh_0.1"].append(self.compute_pck(gt, pred, 0.1))
                 metrics_store["pckh_0.2"].append(self.compute_pck(gt, pred, 0.2))
                 metrics_store["pckh_0.5"].append(self.compute_pck(gt, pred, 0.5))
-                
+
                 # MPJPE / PA-MPJPE
                 mpjpe = self.compute_mpjpe(gt, pred)
-                
-                # Handle PA-MPJPE for missing detections    
+
+                # Handle PA-MPJPE for missing detections
                 aligned = self.procrustes_alignment(gt, pred)
                 pred_aligned = pred.copy()
                 pred_aligned[:, :2] = aligned
                 pa_mpjpe = self.compute_mpjpe(gt, pred_aligned)
-                
+
                 metrics_store["mpjpe"].append(mpjpe)
                 metrics_store["pa_mpjpe"].append(pa_mpjpe)
                 counter += 1
@@ -215,7 +255,7 @@ class PoseEvaluator:
                 "total_ground_truth_samples": len(matches),
                 "detection_rate": detection_rate,
                 "missing_detection_rate": 1.0 - detection_rate,
-            }
+            },
         }
 
         out_path = os.path.join(output_dir, "evaluation_results.json")
@@ -223,4 +263,3 @@ class PoseEvaluator:
             json.dump(results, f, indent=2)
 
         return results
-    

@@ -5,11 +5,16 @@ from typing import Dict, List
 
 def calculate_virtual_keypoints(keypoints_dict: Dict[str, Dict[str, float]]) -> None:
     """Calculate virtual keypoints (Hips, Neck, Spine) from existing keypoints.
-    
-    This function modifies the input dictionary in-place.
-    
-    Args:
-        keypoints_dict: Dictionary mapping keypoint names to {x, y, confidence}
+
+    Notes
+    -----
+    This function modifies the input dictionary in-place and expects the
+    following keys to be present: "LHip", "RHip", "LShoulder", "RShoulder".
+
+    Parameters
+    ----------
+    keypoints_dict : dict[str, dict[str, float]]
+        Mapping from keypoint name to a dict with fields {x, y, confidence}.
     """
     # Hips (midpoint of left and right hip)
     l_hip, r_hip = keypoints_dict["LHip"], keypoints_dict["RHip"]
@@ -39,18 +44,22 @@ def calculate_virtual_keypoints(keypoints_dict: Dict[str, Dict[str, float]]) -> 
 
 def create_keypoint_mapping(kept_keypoint_names: List[str]) -> Dict[str, int]:
     """Create mapping from custom keypoint names to COCO indices.
-    
-    Args:
-        kept_keypoint_names: List of keypoint names to keep
-        
-    Returns:
-        Dictionary mapping keypoint names to COCO indices
+
+    Parameters
+    ----------
+    kept_keypoint_names : list[str]
+        Ordered list of keypoint names.
+
+    Returns
+    -------
+    dict[str, int]
+        Maps custom names to COCO indices. A value of -1 denotes a virtual
+        keypoint (no direct COCO counterpart).
     """
     # Base COCO keypoint mapping
     base_mapping = {
         "Nose": 0,
         "Head": 0,  # Map Head to Nose (closest equivalent)
-
         "LEye": 1,
         "REye": 2,
         "LEar": 3,
@@ -59,23 +68,19 @@ def create_keypoint_mapping(kept_keypoint_names: List[str]) -> Dict[str, int]:
         "RShoulder": 6,
         "LElbow": 7,
         "RElbow": 8,
-        
         "LWrist": 9,
         "LHand": 9,  # Map LHand to LWrist
-        
         "RWrist": 10,
         "RHand": 10,  # Map RHand to RWrist
-        
         "LHip": 11,
         "RHip": 12,
         "LKnee": 13,
         "RKnee": 14,
         "LAnkle": 15,
         "RAnkle": 16,
-        
         "Hips": -1,
         "Neck": -1,
-        "Spine": -1
+        "Spine": -1,
     }
 
     # Create mapping only for kept keypoints
@@ -83,5 +88,5 @@ def create_keypoint_mapping(kept_keypoint_names: List[str]) -> Dict[str, int]:
     for keypoint_name in kept_keypoint_names:
         if keypoint_name in base_mapping:
             mapping[keypoint_name] = base_mapping[keypoint_name]
-        
+
     return mapping

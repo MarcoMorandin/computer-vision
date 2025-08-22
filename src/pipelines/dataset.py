@@ -15,7 +15,16 @@ class DatasetPipeline(BasePipeline):
     """Pipeline for processing datasets with ground truth annotations."""
 
     def run(self) -> None:
-        """Execute the complete dataset processing pipeline."""
+        """Execute the complete dataset processing pipeline.
+
+        Steps
+        -----
+        1. Rectify each input video using camera calibration.
+        2. Triangulate 2D keypoints across images to obtain 3D poses.
+        3. Reproject them back to 2D keypoints and evaluate the triangulation.
+        4. Run pose estimation per selected model and save annotated datasets.
+        5. Optionally apply step 2 and 3
+        """
         pipeline_stages = self.config.pipeline.stages
 
         ##################################################
@@ -56,7 +65,7 @@ class DatasetPipeline(BasePipeline):
             self.process_triangulation(
                 model_name="Ground Truth",
                 predicted_coco=rectified_coco,
-                output_paths=self.config.paths.output.structure.ground_truth
+                output_paths=self.config.paths.output.structure.ground_truth,
             )
 
         ##################################################
@@ -68,9 +77,19 @@ class DatasetPipeline(BasePipeline):
                 self._process_hpe(model_name=model_name, rectified_coco=rectified_coco)
 
     def _process_hpe(self, model_name, rectified_coco):
-        """Process with HPE pose estimator."""
+        """Run a pose estimator, save predictions, visualize, and evaluate.
+
+        Parameters
+        ----------
+        model_name : str
+            Name of the model in config (e.g., "yolo", "vit").
+        rectified_coco : COCOManager
+            Rectified dataset used as input to the estimator.
+        """
         pipeline_stages = self.config.pipeline.stages
-        log_section(self.logger, f"{model_name}: Pose estimation, visualization, and evaluation")
+        log_section(
+            self.logger, f"{model_name}: Pose estimation, visualization, and evaluation"
+        )
         out_folder_structure = self.config.paths.output.structure
         if "yolo" in model_name.lower():
             pose_estimator = YOLOPoseEstimator(
@@ -90,12 +109,13 @@ class DatasetPipeline(BasePipeline):
         # Run pose estimation (confidence threshold now handled by estimator from config)
         predicted = pose_estimator.run_pose_estimation()
 
-        output_coco_path = Path(output_predictions.predictions.root) / "predicted.coco.json"
+        output_coco_path = (
+            Path(output_predictions.predictions.root) / "predicted.coco.json"
+        )
         predicted.save(str(output_coco_path))
 
         self.logger.info(f"Saved {model_name} predictions: {output_coco_path}")
 
-       
         if pipeline_stages.pose_estimation.save_visualizations:
             SkeletonDrawer(predicted).draw_skeleton_on_coco(
                 predicted, output_predictions.predictions.visualizations
@@ -105,9 +125,7 @@ class DatasetPipeline(BasePipeline):
             )
 
         rectified_coco_pruned = rectified_coco.copy()
-        rectified_coco_pruned.prune_keypoints(
-            remove_patterns=["Foot"]
-        )
+        rectified_coco_pruned.prune_keypoints(remove_patterns=["Foot"])
 
         ##################################################
         # Evaluate Human Pose Estimation Results
@@ -116,12 +134,12 @@ class DatasetPipeline(BasePipeline):
             self.evaluator.evaluate(
                 gt_manager=rectified_coco_pruned,
                 pred_manager=predicted,
-                output_dir=output_predictions.evaluations.predictions
+                output_dir=output_predictions.evaluations.predictions,
             )
             self.logger.info(
                 f"Saved {model_name} predictions evaluation to: {output_predictions.evaluations.predictions}"
             )
-    
+
         ##################################################
         # Triangulate Human Pose Estimation Results
         ##################################################
@@ -130,7 +148,5 @@ class DatasetPipeline(BasePipeline):
                 model_name=model_name,
                 predicted_coco=predicted,
                 output_paths=output_predictions,
-                gt_coco=rectified_coco_pruned
+                gt_coco=rectified_coco_pruned,
             )
-
-    

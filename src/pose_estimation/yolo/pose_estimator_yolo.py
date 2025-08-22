@@ -28,41 +28,42 @@ class YOLOPoseEstimator:
         config: Optional[Any] = None,
         logger: Logger = None,
     ):
-        """Initialize the YOLOPoseEstimator.
+        """Initialize the YOLO pose estimator.
 
-        Args:
-            coco_manager: Initialized COCOManager object
-            config: Configuration object with YOLO settings
-            model_weights_path: Path to YOLO pose model weights (overrides config)
-            prune_patterns: Keypoint patterns to prune (overrides config)
+        Parameters
+        ----------
+        coco_manager : COCOManager
+            Dataset manager to read/write annotations.
+        config : Any | None
+            Configuration with YOLO settings and thresholds.
+        logger : logging.Logger | None
+            Optional logger for messages.
         """
         self.coco_manager = coco_manager
         self.config = config
         self.logger = logger
-        
+
         # Determine model weights path
         weights_path = config.models.yolo.pose_model_path
         self.model = YOLO(os.path.abspath(weights_path))
-        
+
         # Configure device
         self.device = config.models.device
-        
+
         # Determine prune patterns
         patterns = config.models.keypoints.prune_patterns
         self.kept_keypoint_names = self.coco_manager.prune_keypoints(patterns)
-        
+
         # Create keypoint mapping
         self.yolo_to_custom_mapping = create_keypoint_mapping(self.kept_keypoint_names)
 
-
     def run_pose_estimation(self) -> COCOManager:
-        """Run pose estimation on images and update COCO dataset.
+        """Run pose estimation on images and update the dataset.
 
-        Args:
-            confidence_threshold: Minimum confidence threshold for detections (uses config if None)
-
-        Returns:
-            Updated COCOManager object with new pose annotations
+        Returns
+        -------
+        COCOManager
+            Updated dataset with pose annotations. Uses thresholds from config.
         """
         # Determine confidence threshold
         confidence_threshold = self.config.models.yolo.confidence_threshold
@@ -78,11 +79,13 @@ class YOLOPoseEstimator:
         for img in tqdm(images, desc="Running YOLO Pose Estimation", unit="image"):
             img_id = img["id"]
             file_name = img["file_name"]
-            
+
             image = cv2.imread(file_name)
-                
-            results = self.model(image, conf=confidence_threshold, verbose=False, device=self.device)
-            
+
+            results = self.model(
+                image, conf=confidence_threshold, verbose=False, device=self.device
+            )
+
             # Process detections
             self._process_detections(results[0], img_id, category_id)
 
@@ -93,20 +96,23 @@ class YOLOPoseEstimator:
         video_path: str,
         output_path: str,
     ) -> COCOManager:
-        """
-        Run pose estimation on video and create COCO dataset with predictions.
+        """Run pose estimation on a video and write an annotated output.
 
-        Args:
-            video_path: Path to input video
-            output_path: Path to save output video with predictions
-            confidence_threshold: Minimum confidence threshold for detections (uses config if None)
-            
-        Returns:
-            Updated COCOManager with pose predictions
+        Parameters
+        ----------
+        video_path : str
+            Path to input video.
+        output_path : str
+            Path to save output video with predictions.
+
+        Returns
+        -------
+        COCOManager
+            Updated dataset with pose predictions for frames.
         """
         # Determine confidence threshold
         confidence_threshold = self.config.models.yolo.confidence_threshold
-        
+
         # Open video
         drawer = SkeletonDrawer(self.coco_manager)
         cap = cv2.VideoCapture(video_path)
@@ -116,7 +122,7 @@ class YOLOPoseEstimator:
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        
+
         # Get video codec from config
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
@@ -124,20 +130,24 @@ class YOLOPoseEstimator:
         # Get person category for annotations
         person_category = self.coco_manager.get_person_category()
         category_id = person_category["id"]
-        
+
         # Get all images from the video COCO dataset
         self.coco_manager.clear_annotations()
         self.coco_manager.clear_images()
 
         self.logger.info(f"Processing video: {video_path}")
 
-        for frame_idx in tqdm(range(total_frames), desc="Running YoloPose Estimation", unit="frame"):
+        for frame_idx in tqdm(
+            range(total_frames), desc="Running YoloPose Estimation", unit="frame"
+        ):
             _, frame = cap.read()
 
-            results = self.model(frame, confidence_threshold, verbose=False, device=self.device)
+            results = self.model(
+                frame, confidence_threshold, verbose=False, device=self.device
+            )
 
             filename = f"{Path(video_path).stem}_frame_{frame_idx:04d}.rf.jpg"
-            
+
             img_id = self.coco_manager.add_image(
                 file_name=filename,
                 height=frame.shape[0],
@@ -145,7 +155,9 @@ class YOLOPoseEstimator:
             )
 
             # Process detections
-            keypoint = self._process_detections(next(results), img_id=img_id, category_id=category_id)
+            keypoint = self._process_detections(
+                next(results), img_id=img_id, category_id=category_id
+            )
 
             if keypoint is not None:
                 frame = drawer.draw_skeleton_on_image(frame, keypoint)
@@ -159,14 +171,20 @@ class YOLOPoseEstimator:
         self.coco_manager.save(str(output_path).replace(".mp4", ".json"))
 
         return self.coco_manager
-        
-    def _process_detections(self, result, img_id: int = None, category_id: int = None) -> List[float]:
+
+    def _process_detections(
+        self, result, img_id: int = None, category_id: int = None
+    ) -> List[float]:
         """Process YOLO detections and add annotations.
-        
-        Args:
-            result: YOLO detection result
-            img_id: Image ID for annotation
-            category_id: Person category ID
+
+        Parameters
+        ----------
+        result : Any
+            YOLO detection result object.
+        img_id : int | None
+            Image id for annotation.
+        category_id : int | None
+            Person category id.
         """
         if result.keypoints is None or result.boxes is None:
             return
@@ -180,7 +198,10 @@ class YOLOPoseEstimator:
             kpts_conf = keypoints_tensor.conf[person_idx].cpu().numpy()
 
             # Initialize custom keypoint dictionary
-            custom_kpts = {name: {"x": 0.0, "y": 0.0, "confidence": 0.0} for name in self.kept_keypoint_names}
+            custom_kpts = {
+                name: {"x": 0.0, "y": 0.0, "confidence": 0.0}
+                for name in self.kept_keypoint_names
+            }
 
             # Fill in available YOLO keypoints
             for custom_name, yolo_idx in self.yolo_to_custom_mapping.items():
@@ -195,7 +216,9 @@ class YOLOPoseEstimator:
             calculate_virtual_keypoints(custom_kpts)
 
             # Convert to COCO format
-            keypoints_flat = keypoints_to_flat_array(custom_kpts, self.kept_keypoint_names)
+            keypoints_flat = keypoints_to_flat_array(
+                custom_kpts, self.kept_keypoint_names
+            )
 
             # Convert bbox from [center_x, center_y, w, h] to [top_left_x, top_left_y, w, h]
             bbox_xywh = boxes_tensor.xywh[person_idx].cpu().numpy()
@@ -205,7 +228,7 @@ class YOLOPoseEstimator:
                 float(bbox_xywh[2]),  # width
                 float(bbox_xywh[3]),  # height
             ]
-        
+
             # Add annotation using COCOManager
             self.coco_manager.add_annotation(
                 image_id=img_id,

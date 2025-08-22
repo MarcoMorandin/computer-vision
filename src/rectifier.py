@@ -1,10 +1,13 @@
-"""Dataset and video rectification module."""
+"""Rectification utilities for datasets and videos.
+
+Rectify images/frames and 2D keypoints using per-camera calibration
+(intrinsics + distortion) provided by the CameraManager.
+"""
 
 import cv2
 import numpy as np
 import os
-import glob
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from tqdm import tqdm
 
 from .utils.camera.camera_manager import CameraManager
@@ -20,20 +23,35 @@ class Rectifier:
     """
 
     def __init__(self, camera_manager: CameraManager):
-        """
-        Initialize the DatasetRectifier.
+        """Initialize the rectifier.
 
-        Args:
-            camera_manager: Initialized CameraManager object
-            coco_dataset: Initialized COCODataset object (required if mode="coco")
-            mode: Either "coco" for dataset rectification or "video" for video rectification
+        Parameters
+        ----------
+        camera_manager : CameraManager
+            Provides access to per-camera calibration (intrinsics + distortion).
         """
         self.camera_manager = camera_manager
 
     def _rectify_keypoints(
         self, keypoints: List[float], mtx: np.ndarray, dist: np.ndarray
     ) -> List[float]:
-        """Rectify keypoints."""
+        """Undistort visible keypoints in COCO triplet format.
+
+        Parameters
+        ----------
+        keypoints : list[float]
+            Flattened COCO keypoints [x1, y1, v1, x2, y2, v2, ...]. Only entries
+            with v > 0 are rectified.
+        mtx : np.ndarray
+            3x3 intrinsic camera matrix.
+        dist : np.ndarray
+            Distortion coefficient vector.
+
+        Returns
+        -------
+        list[float]
+            New flattened keypoints with undistorted coordinates for visible points.
+        """
         num_kpts = len(keypoints) // 3
         new_keypoints = keypoints.copy()
 
@@ -63,15 +81,21 @@ class Rectifier:
     def rectify_dataset(
         self, coco_dataset: COCOManager, input_images_dir: str, output_images_dir: str
     ) -> COCOManager:
-        """
-        Rectify entire COCO dataset and update image paths.
+        """Rectify an entire COCO dataset and update image paths and annotations.
 
-        Args:
-            input_images_dir: Directory containing input images
-            output_images_dir: Directory to save rectified images
+        Parameters
+        ----------
+        coco_dataset : COCOManager
+            Dataset to modify in place (images/annotations updated).
+        input_images_dir : str
+            Directory containing original input images.
+        output_images_dir : str
+            Directory to save undistorted images.
 
-        Returns:
-            Modified COCODataset object with updated paths and rectified annotations
+        Returns
+        -------
+        COCOManager
+            The same manager instance with updated file_name paths and rectified annotations.
         """
 
         os.makedirs(output_images_dir, exist_ok=True)
@@ -88,7 +112,16 @@ class Rectifier:
         return coco_dataset
 
     def rectify_video(self, video_path: str, output_dir: str) -> None:
-        """Process single video file."""
+        """Undistort a single video using the camera calibration inferred from its filename.
+
+        Parameters
+        ----------
+        video_path : str
+            Path to the input video. The filename must contain the camera index
+            (e.g., out3_frame_0001.mp4) so it can be parsed.
+        output_dir : str
+            Directory where the rectified video will be written with the same basename.
+        """
         basename = os.path.basename(video_path)
         cam_index = extract_camera_number(basename)
         if cam_index is None:
@@ -117,8 +150,6 @@ class Rectifier:
             mtx, dist, None, mtx, (width, height), cv2.CV_32FC1
         )
 
-        frame_count = 0
-
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -129,7 +160,6 @@ class Rectifier:
                 frame, map_x, map_y, interpolation=cv2.INTER_LINEAR
             )
             out.write(rectified_frame)
-            frame_count += 1
 
         cap.release()
         out.release()
@@ -142,7 +172,19 @@ class Rectifier:
         output_dir: str,
         coco_dataset: COCOManager,
     ) -> None:
-        """Process single image and its annotations."""
+        """Rectify a single image and its associated annotations.
+
+        Parameters
+        ----------
+        img_info : dict
+            COCO image dictionary (must include id and file_name).
+        input_dir : str
+            Directory containing the original image file.
+        output_dir : str
+            Directory where the rectified image will be saved.
+        coco_dataset : COCOManager
+            Manager used to update image paths and annotation fields.
+        """
         file_name = img_info["file_name"]
         image_id = img_info["id"]
         cam_index = extract_camera_number(file_name)
@@ -164,7 +206,7 @@ class Rectifier:
         rectified_img = cv2.remap(img, map_x, map_y, interpolation=cv2.INTER_LINEAR)
         cv2.imwrite(output_path, rectified_img)
 
-        # Update image path to be relative to project root
+        # Update image path to the rectified image (absolute path)
         coco_dataset.update_image_path(image_id, output_path)
 
         # Get and rectify annotations for this image

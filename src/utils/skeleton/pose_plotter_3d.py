@@ -1,3 +1,8 @@
+"""3D visualization utilities for triangulated poses.
+
+Generates animations of 3D keypoints using the COCO skeleton topology.
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -6,7 +11,7 @@ import os
 import sys
 from typing import Dict
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from utils.dataset.coco_utils import COCOManager
 from utils.dataset.skeleton_3d import SkeletonManager3D
 
@@ -15,7 +20,15 @@ class PosePlotter3D:
     """A class for plotting 3D triangulated poses using COCO skeleton structure."""
 
     def __init__(self, coco_manager: COCOManager, skeleton_manager: SkeletonManager3D):
-        """Initialize the PosePlotter3D."""
+        """Initialize the 3D pose plotter.
+
+        Parameters
+        ----------
+        coco_manager : COCOManager
+            Provides keypoint names and skeleton connections.
+        skeleton_manager : SkeletonManager3D
+            Holds per-frame 3D keypoints to visualize.
+        """
         self.coco_manager = coco_manager
         self.skeleton_manager = skeleton_manager
         self.keypoint_names = coco_manager.get_keypoint_names()
@@ -28,19 +41,35 @@ class PosePlotter3D:
         }
         self.connection_color = "green"  # Green for all connections
         self.side_indices = {
-            side: {i for i, n in enumerate(self.keypoint_names) if n.lower().startswith(side)}
+            side: {
+                i
+                for i, n in enumerate(self.keypoint_names)
+                if n.lower().startswith(side)
+            }
             for side in ["left", "right"]
         }
-        self.side_indices["center"] = set(range(len(self.keypoint_names))) - self.side_indices["left"] - self.side_indices["right"]
+        self.side_indices["center"] = (
+            set(range(len(self.keypoint_names)))
+            - self.side_indices["left"]
+            - self.side_indices["right"]
+        )
         # Sort frame IDs numerically instead of lexicographically
-        self.frame_ids = sorted(self.skeleton_manager.get_frame_ids(), key=lambda x: int(x))
+        self.frame_ids = sorted(
+            self.skeleton_manager.get_frame_ids(), key=lambda x: int(x)
+        )
 
         # Get poses data from skeleton manager
         self.poses_data = self._load_poses_from_skeleton_manager()
-        
 
     def _load_poses_from_skeleton_manager(self):
-        """Load 3D poses from the skeleton manager and convert to a NumPy array."""
+        """Load 3D poses from the skeleton manager and convert to a NumPy array.
+
+        Returns
+        -------
+        np.ndarray
+            Array with shape (num_frames, num_keypoints, 3) filled with NaNs
+            where keypoints are missing.
+        """
         # Use the public methods from SkeletonManager3D
         num_kps = len(self.keypoint_names)
 
@@ -54,40 +83,40 @@ class PosePlotter3D:
                 for kp in keypoints_3d:
                     if kp is not None and len(kp) == 3:
                         keypoints_array.append(kp)
-                
+
                 keypoints_array = np.array(keypoints_array)
-                
+
                 # Fill poses_data with available keypoints
                 if keypoints_array.shape[0] <= num_kps:
-                    poses_data[i, :keypoints_array.shape[0]] = keypoints_array
+                    poses_data[i, : keypoints_array.shape[0]] = keypoints_array
                 else:
                     poses_data[i] = keypoints_array[:num_kps]
-        
+
         return poses_data
 
     def _compute_bounds(self):
-        """Computes the global bounds for all poses to set axis limits."""
+        """Compute global axis limits across all frames for consistent scaling."""
         valid_points = self.poses_data[~np.isnan(self.poses_data)].reshape(-1, 3)
         if valid_points.size == 0:
             return [(-1, 1)] * 3
-        
+
         min_vals, max_vals = valid_points.min(axis=0), valid_points.max(axis=0)
         ranges = max_vals - min_vals
         ranges[ranges == 0] = 1.0  # Avoid division by zero
         margins = ranges * 0.05
-        
+
         return [(mi - m, ma + m) for mi, ma, m in zip(min_vals, max_vals, margins)]
 
     def _setup_plot(self, title: str):
-        """Initializes the 3D plot figure, axes, and artists."""
+        """Initialize the 3D plot figure, axes, and artists."""
         fig = plt.figure(figsize=(8, 7))
         ax = fig.add_subplot(111, projection="3d")
-        
+
         xlim, ylim, zlim = self._compute_bounds()
         ax.set_xlim(xlim)
         ax.set_ylim(ylim)
         ax.set_zlim(zlim)
-        
+
         # Calculate ranges from the limits to be used in set_box_aspect
         ranges = (xlim[1] - xlim[0], ylim[1] - ylim[0], zlim[1] - zlim[0])
         ax.set_box_aspect(ranges)
@@ -95,10 +124,12 @@ class PosePlotter3D:
         ax.set_ylabel("Y")
         ax.set_zlabel("Z")
         ax.set_title(title)
-        
+
         artists = {}
         # Single scatter plot for all keypoints in red
-        artists["scatter"] = ax.scatter([], [], [], color=self.keypoint_colors["all"], s=40, label="Keypoints")
+        artists["scatter"] = ax.scatter(
+            [], [], [], color=self.keypoint_colors["all"], s=40, label="Keypoints"
+        )
         ax.legend(loc="upper right")
 
         # All connections in green
@@ -109,13 +140,17 @@ class PosePlotter3D:
         return fig, ax, artists
 
     def _update_plot(self, frame_idx: int, artists: Dict, ax: Axes3D):
-        """Updates the plot artists for a given frame."""
+        """Update plot artists for a given frame index."""
         pose = self.poses_data[frame_idx]
-        
+
         # Update single scatter plot with all valid keypoints
         valid_points = pose[~np.isnan(pose)].reshape(-1, 3)
         if valid_points.size > 0:
-            artists["scatter"]._offsets3d = (valid_points[:, 0], valid_points[:, 1], valid_points[:, 2])
+            artists["scatter"]._offsets3d = (
+                valid_points[:, 0],
+                valid_points[:, 1],
+                valid_points[:, 2],
+            )
         else:
             artists["scatter"]._offsets3d = ([], [], [])
 
@@ -133,15 +168,23 @@ class PosePlotter3D:
             for text in artists["texts"]:
                 text.remove()
             artists["texts"].clear()
-        
+
         all_artists = [artists["scatter"]] + artists["lines"] + artists.get("texts", [])
         return all_artists
 
     def animate_frames(self, save: str, interval: int = 100):
-        """Animates the sequence of 3D poses."""
+        """Animate the sequence of 3D poses and save to disk.
+
+        Parameters
+        ----------
+        save : str
+            Output file path (.mp4 uses ffmpeg, others use imagemagick).
+        interval : int, default=100
+            Delay between frames in milliseconds.
+        """
         if self.poses_data.size == 0:
             raise ValueError("No frames available for animation.")
-        
+
         title = "3D Pose Animation"
         fig, ax, artists = self._setup_plot(title)
 
@@ -149,8 +192,10 @@ class PosePlotter3D:
             ax.set_title(f"{title} | Frame {self.frame_ids[frame_idx]}")
             return self._update_plot(frame_idx, artists, ax)
 
-        anim = FuncAnimation(fig, update, frames=len(self.frame_ids), interval=interval, blit=False)
-        
+        anim = FuncAnimation(
+            fig, update, frames=len(self.frame_ids), interval=interval, blit=False
+        )
+
         fps = max(1, int(1000 / interval))
         writer = "ffmpeg" if save.lower().endswith(".mp4") else "imagemagick"
         os.makedirs(os.path.dirname(save), exist_ok=True)

@@ -1,3 +1,9 @@
+"""ProbPose-based pose estimation pipeline (MMPose) with YOLO detections.
+
+This script remaps COCO keypoints to the custom skeleton (with virtual joints),
+then runs a ProbPose model to predict keypoints and writes a COCO JSON.
+"""
+
 from __future__ import annotations
 
 import os
@@ -16,15 +22,31 @@ from mmpose.apis.inference import init_model, inference_topdown
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+#!! TEST SCRIPT WORKS BUT I CANNOT BE ABLE TO RE-PERFORM THE INSTALLATION (DONE ONE MONTH AGO, NOW THERE ARE DEPENDENCIES CONFLICTS)
 
 # --------------------------- Mapping & Utilities ---------------------------
 
-def remap_to_custom_skeleton(coco_kpts: Dict[str, Dict[str, float]], custom_keypoint_names: List[str]):
-    """Remap COCO keypoints to custom skeleton, add virtual joints (Hips, Neck, Spine).
 
-    Mirrors logic in other pipelines. Missing joints default to zero-confidence.
+def remap_to_custom_skeleton(
+    coco_kpts: Dict[str, Dict[str, float]], custom_keypoint_names: List[str]
+):
+    """Remap COCO keypoints to a custom skeleton and add virtual joints.
+
+    Parameters
+    ----------
+    coco_kpts : dict[str, dict[str, float]]
+        COCO keypoints map (e.g., nose, left_hip, ...).
+    custom_keypoint_names : list[str]
+        Target keypoint order for the custom skeleton.
+
+    Returns
+    -------
+    dict[str, dict[str, float]]
+        Keypoints in the custom schema, including Hips/Neck/Spine when available.
     """
-    custom_kpts = {name: {"x": 0.0, "y": 0.0, "confidence": 0.0} for name in custom_keypoint_names}
+    custom_kpts = {
+        name: {"x": 0.0, "y": 0.0, "confidence": 0.0} for name in custom_keypoint_names
+    }
 
     def get_kpt(name):
         return coco_kpts.get(name, {"x": 0.0, "y": 0.0, "confidence": 0.0})
@@ -73,7 +95,23 @@ def remap_to_custom_skeleton(coco_kpts: Dict[str, Dict[str, float]], custom_keyp
     return custom_kpts
 
 
-def keypoints_to_flat_array(custom_kpts: Dict[str, Dict[str, float]], custom_keypoint_names: List[str]):
+def keypoints_to_flat_array(
+    custom_kpts: Dict[str, Dict[str, float]], custom_keypoint_names: List[str]
+):
+    """Convert a custom keypoint dict to a flat COCO keypoint array.
+
+    Parameters
+    ----------
+    custom_kpts : dict[str, dict[str, float]]
+        Mapping from keypoint name to {x, y, confidence}.
+    custom_keypoint_names : list[str]
+        Ordered list of keypoints in the target schema.
+
+    Returns
+    -------
+    list[float]
+        Flattened keypoints in COCO format [x1, y1, v1, ...].
+    """
     keypoints_flat = []
     for name in custom_keypoint_names:
         kpt = custom_kpts[name]
@@ -86,8 +124,18 @@ def keypoints_to_flat_array(custom_kpts: Dict[str, Dict[str, float]], custom_key
 def prune_category_feet(category: Dict):
     """Remove foot/toe keypoints (if any) and rebuild skeleton indices in-place.
 
-    For standard COCO (17 kp) this typically leaves the list unchanged, but we
-    retain the logic for consistency with other scripts.
+    For standard COCO (17 keypoints) this often leaves the list unchanged, but
+    the logic is kept for consistency with other scripts.
+
+    Parameters
+    ----------
+    category : dict
+        COCO person category definition to modify in-place.
+
+    Returns
+    -------
+    list[str]
+        Kept keypoint names.
     """
     keypoints = category.get("keypoints", [])
 
@@ -115,6 +163,7 @@ def prune_category_feet(category: Dict):
 
 # --------------------------- Core Pipeline ---------------------------
 
+
 def run_pose_estimation_probpose(
     input_dir: str,
     input_json: str,
@@ -124,6 +173,25 @@ def run_pose_estimation_probpose(
     detector_model_path: str = "yolo11l.pt",
     detection_conf: float = 0.50,
 ):
+    """Run ProbPose (MMPose) pose estimation on a COCO image set.
+
+    Parameters
+    ----------
+    input_dir : str
+        Directory containing images referenced by the input JSON.
+    input_json : str
+        Input COCO JSON path.
+    output_json : str
+        Output COCO JSON path to write predictions.
+    config_path : str
+        MMPose/ProbPose config file path.
+    checkpoint_path : str
+        MMPose/ProbPose checkpoint (.pth) path.
+    detector_model_path : str, default="yolo11l.pt"
+        YOLO weights for person detection.
+    detection_conf : float, default=0.5
+        YOLO person detection confidence threshold.
+    """
     # Load COCO json and deep copy
     with open(input_json, "r") as f:
         coco_data = json.load(f)
@@ -184,7 +252,9 @@ def run_pose_estimation_probpose(
             continue
 
         # Remove existing annotations for this image
-        coco_pose["annotations"] = [a for a in coco_pose["annotations"] if a["image_id"] != img_id]
+        coco_pose["annotations"] = [
+            a for a in coco_pose["annotations"] if a["image_id"] != img_id
+        ]
 
         # Person detection (YOLO) on PIL image
         pil_img = Image.open(file_path).convert("RGB")
@@ -213,7 +283,9 @@ def run_pose_estimation_probpose(
 
         # Pose estimation for all boxes at once
         # inference_topdown expects xyxy by default
-        pose_samples = inference_topdown(model, file_path, bboxes=boxes_xyxy, bbox_format="xyxy")
+        pose_samples = inference_topdown(
+            model, file_path, bboxes=boxes_xyxy, bbox_format="xyxy"
+        )
 
         # Build annotations
         max_ann_id = max([a["id"] for a in coco_pose["annotations"]], default=0)
@@ -249,14 +321,23 @@ def run_pose_estimation_probpose(
                     "confidence": float(kpts_conf_np[i]),
                 }
 
-            custom_keypoints = remap_to_custom_skeleton(coco_kpts_person, kept_keypoint_names)
-            keypoints_flat = keypoints_to_flat_array(custom_keypoints, kept_keypoint_names)
+            custom_keypoints = remap_to_custom_skeleton(
+                coco_kpts_person, kept_keypoint_names
+            )
+            keypoints_flat = keypoints_to_flat_array(
+                custom_keypoints, kept_keypoint_names
+            )
 
             det_box_xyxy = boxes_xyxy[person_idx]
             x1, y1, x2, y2 = det_box_xyxy
             bbox_w = x2 - x1
             bbox_h = y2 - y1
-            bbox = [round(float(x1), 2), round(float(y1), 2), round(float(bbox_w), 2), round(float(bbox_h), 2)]
+            bbox = [
+                round(float(x1), 2),
+                round(float(y1), 2),
+                round(float(bbox_w), 2),
+                round(float(bbox_h), 2),
+            ]
 
             max_ann_id += 1
             coco_pose["annotations"].append(
@@ -284,14 +365,36 @@ def run_pose_estimation_probpose(
 
 
 def parse_args():
+    """Parse command-line arguments for the ProbPose script."""
     p = argparse.ArgumentParser(description="Dataset-wide ProbPose pose estimation")
-    p.add_argument("--input-image-dir", required=True, help="Directory containing images referenced in input COCO json")
-    p.add_argument("--input-json", required=True, help="Input COCO dataset json (will be copied/pruned and filled with predictions)")
-    p.add_argument("--output-json", required=True, help="Output COCO json path for predictions")
+    p.add_argument(
+        "--input-image-dir",
+        required=True,
+        help="Directory containing images referenced in input COCO json",
+    )
+    p.add_argument(
+        "--input-json",
+        required=True,
+        help="Input COCO dataset json (will be copied/pruned and filled with predictions)",
+    )
+    p.add_argument(
+        "--output-json", required=True, help="Output COCO json path for predictions"
+    )
     p.add_argument("--config", required=True, help="ProbPose config file path")
-    p.add_argument("--checkpoint", required=True, help="ProbPose checkpoint (.pth) path")
-    p.add_argument("--detector-model", default="yolo11l.pt", help="YOLO weights for person detection")
-    p.add_argument("--det-conf", type=float, default=0.5, help="YOLO person detection confidence threshold")
+    p.add_argument(
+        "--checkpoint", required=True, help="ProbPose checkpoint (.pth) path"
+    )
+    p.add_argument(
+        "--detector-model",
+        default="yolo11l.pt",
+        help="YOLO weights for person detection",
+    )
+    p.add_argument(
+        "--det-conf",
+        type=float,
+        default=0.5,
+        help="YOLO person detection confidence threshold",
+    )
     return p.parse_args()
 
 

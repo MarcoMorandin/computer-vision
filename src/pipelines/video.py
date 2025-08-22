@@ -1,38 +1,40 @@
 """Video processing pipeline."""
 
-import logging
-import cv2
-import re
 from pathlib import Path
-from typing import Dict, List
-
-from omegaconf import DictConfig
 
 from utils.dataset.coco_utils import COCOManager
 
 from .base import BasePipeline
 from ..pose_estimation.ViTPose.pose_estimator_vitpose import ViTPoseEstimator
 from ..pose_estimation.yolo.pose_estimator_yolo import YOLOPoseEstimator
-from ..utils.skeleton.pose_plotter_2d import SkeletonDrawer
 from ..utils.config_utils import log_section
-from ..rectifier import Rectifier
+
 
 class VideoPipeline(BasePipeline):
     """Pipeline for processing videos without ground truth."""
-    
-    def run(self) -> None:
-        """Execute the complete video processing pipeline."""
 
-        video_files = [str(f) for f in self.config.paths.data.video_files if Path(f).exists()]        
+    def run(self) -> None:
+        """Execute the complete video processing pipeline.
+
+        Steps
+        -----
+        1. Rectify each input video using camera calibration.
+        2. Run pose estimation per selected model and save annotated videos.
+        3. Optionally triangulate across frames and save 3D outputs.
+        """
+
+        video_files = [
+            str(f) for f in self.config.paths.data.video_files if Path(f).exists()
+        ]
         self.logger.info(f"Processing {len(video_files)} video files")
-        
+
         ##################################################
         # Rectify Videos
         ##################################################
-        
+
         rectified_output = Path(self.config.paths.output.structure.rectified.root)
-        
-        for video_path in video_files:            
+
+        for video_path in video_files:
             self.logger.info(f"Rectifying video: {video_path}")
             self.rectifier.rectify_video(video_path, rectified_output)
             self.logger.info(f"Rectified video saved to: {rectified_output}")
@@ -53,34 +55,44 @@ class VideoPipeline(BasePipeline):
                     config=self.config,
                     logger=self.logger,
                 )
-                output_prediction = Path(self.config.paths.output.structure.yolo.predictions.root)
-                output_triangulation = Path(self.config.paths.output.structure.yolo.triangulations.root)
+                output_prediction = Path(
+                    self.config.paths.output.structure.yolo.predictions.root
+                )
+                output_triangulation = Path(
+                    self.config.paths.output.structure.yolo.triangulations.root
+                )
             else:
                 pose_estimator = ViTPoseEstimator(
                     coco_manager=self.coco_dataset,
                     config=self.config,
                     logger=self.logger,
                 )
-                output_prediction = Path(self.config.paths.output.structure.vit.predictions.root)
-                output_triangulation = Path(self.config.paths.output.structure.vit.triangulations.root)
+                output_prediction = Path(
+                    self.config.paths.output.structure.vit.predictions.root
+                )
+                output_triangulation = Path(
+                    self.config.paths.output.structure.vit.triangulations.root
+                )
 
-            for video_path in video_files_rectified:            
+            for video_path in video_files_rectified:
                 video_name = Path(video_path).stem
                 output_path = output_prediction / Path(f"{video_name}_{model_name}.mp4")
                 output_path.parent.mkdir(parents=True, exist_ok=True)
-                
+
                 # Run pose estimation (confidence threshold now handled by estimator from config)
                 pose_estimator.run_pose_estimation_on_video(
                     video_path=video_path,
                     output_path=output_path,
                 )
                 self.logger.info(f"Saved {model_name} video output: {output_path}")
-            
+
             ##################################################
             # Triangulate human pose estimation from videos
             ##################################################
             if self.config.pipeline.stages.triangulation.enabled:
-                log_section(self.logger, f"{model_name}: Triangulate predicted 2D and visualize")
+                log_section(
+                    self.logger, f"{model_name}: Triangulate predicted 2D and visualize"
+                )
                 cocos_json = list(Path(output_prediction).glob("*.json"))
                 coco_manager = COCOManager(str(cocos_json[0]))
                 for coco_json in cocos_json[1:]:
@@ -89,5 +101,5 @@ class VideoPipeline(BasePipeline):
                 self.triangulate_and_visualize(
                     coco_manager=coco_manager,
                     output_root=output_triangulation,
-                    output_visuals=output_triangulation
+                    output_visuals=output_triangulation,
                 )

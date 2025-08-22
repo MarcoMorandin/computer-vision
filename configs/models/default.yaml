@@ -21,7 +21,7 @@ vit:
   # Model settings
   model_name: "usyd-community/vitpose-plus-huge"  
   detection_model_path: "weights/yolov8x-worldv2.pt"
-  confidence_threshold: 0.7
+  confidence_threshold: 0.6
 
 triangulation:
   use_bundle_adjustment: False
